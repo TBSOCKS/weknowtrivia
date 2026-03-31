@@ -22,6 +22,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
         return (
           <div key={ans.id} className={`board-cell ${revealed ? 'revealed' : ''}`}>
             <div className="board-cell-inner">
+
               {/* Front: season label */}
               <div className="board-cell-front cell-shimmer border border-white/10 flex flex-col items-center justify-center p-1 text-center">
                 <span className="text-white font-display tracking-wide leading-tight"
@@ -30,21 +31,20 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                 </span>
               </div>
 
-              {/* Back: castaway photo — use background-image so circular PNGs fill the square */}
-              <div
-                className="board-cell-back border border-brand-green/60 overflow-hidden relative"
-                style={{
-                  backgroundColor: '#1a1a20',
-                  backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center top',
-                  backgroundRepeat: 'no-repeat',
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+              {/* Back: castaway photo — circular */}
+              <div className="board-cell-back bg-brand-card border border-brand-green/60 overflow-hidden relative flex items-center justify-center">
+                {photoUrl && (
+                  <img
+                    src={photoUrl}
+                    alt={ans.castaways?.name}
+                    className="absolute w-[85%] h-[85%] object-cover rounded-full"
+                    style={{ objectPosition: 'center top' }}
+                    onError={e => { e.target.style.display = 'none' }}
+                  />
+                )}
                 <div className="absolute bottom-0 left-0 right-0 p-0.5 text-center">
                   <span className="text-white font-bold drop-shadow-md"
-                        style={{ fontSize: 'clamp(9px, 1.3vw, 16px)' }}>
+                        style={{ fontSize: 'clamp(7px, 1vw, 13px)' }}>
                     {ans.castaways?.name?.split(' ')[0]}
                   </span>
                 </div>
@@ -52,6 +52,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                   <div className="absolute inset-0 bg-brand-green/20 pointer-events-none" />
                 )}
               </div>
+
             </div>
           </div>
         )
