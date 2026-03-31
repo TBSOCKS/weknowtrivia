@@ -286,7 +286,7 @@ export default function SeasonsPage() {
                                   <td className="py-2 pr-4 text-brand-muted font-mono">{c.castaway_id}</td>
                                   <td className="py-2 pr-4">
                                     <img
-                                      src={`https://gradientdescending.com/survivor/castaways/colour/${season.version_season}${c.castaway_id}.png`}
+                                      src={`https://gradientdescending.com/survivor/castaways/colour/${season.version_season}US${c.castaway_id}.png`}
                                       alt={c.name}
                                       className="w-8 h-8 rounded-full object-cover bg-brand-card"
                                       onError={e => { e.target.style.display = 'none' }}

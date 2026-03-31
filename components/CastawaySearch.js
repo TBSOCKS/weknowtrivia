@@ -66,7 +66,7 @@ export default function CastawaySearch({ onSelect, placeholder = 'Search castawa
               className="w-full text-left px-4 py-2.5 hover:bg-brand-card flex items-center gap-3 border-b border-brand-border/30 last:border-0 transition-colors"
             >
               <img
-                src={`https://gradientdescending.com/survivor/castaways/colour/${c.seasons?.version_season}${c.castaway_id}.png`}
+                src={`https://gradientdescending.com/survivor/castaways/colour/${c.seasons?.version_season}US${c.castaway_id}.png`}
                 alt={c.name}
                 className="w-8 h-8 rounded-full object-cover bg-brand-card flex-shrink-0"
                 onError={e => { e.target.style.display = 'none' }}

@@ -242,7 +242,7 @@ export default function ListsPage() {
                                 {ans ? (
                                   <>
                                     <img
-                                      src={`https://gradientdescending.com/survivor/castaways/colour/${ans.castaways?.seasons?.version_season}${ans.castaways?.castaway_id}.png`}
+                                      src={`https://gradientdescending.com/survivor/castaways/colour/${ans.castaways?.seasons?.version_season}US${ans.castaways?.castaway_id}.png`}
                                       alt={ans.castaways?.name}
                                       className="w-8 h-8 rounded-full object-cover"
                                       onError={e => { e.target.style.display = 'none' }}
@@ -288,7 +288,7 @@ export default function ListsPage() {
                                         className="w-full text-left px-3 py-2 hover:bg-brand-card text-sm text-white border-b border-brand-border/30 last:border-0 flex items-center gap-2"
                                       >
                                         <img
-                                          src={`https://gradientdescending.com/survivor/castaways/colour/${c.seasons?.version_season}${c.castaway_id}.png`}
+                                          src={`https://gradientdescending.com/survivor/castaways/colour/${c.seasons?.version_season}US${c.castaway_id}.png`}
                                           alt={c.name}
                                           className="w-6 h-6 rounded-full object-cover bg-brand-card"
                                           onError={e => { e.target.style.display = 'none' }}

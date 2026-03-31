@@ -12,7 +12,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
       {answers.map((ans, idx) => {
         const revealed = revealedIds.has(ans.id)
         const photoUrl = ans.castaways?.seasons?.version_season
-          ? `https://gradientdescending.com/survivor/castaways/colour/${ans.castaways.seasons.version_season}${ans.castaways.castaway_id}.png`
+          ? `https://gradientdescending.com/survivor/castaways/colour/${ans.castaways.seasons.version_season}US${ans.castaways.castaway_id}.png`
           : null
 
         return (
