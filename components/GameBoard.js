@@ -3,11 +3,15 @@ import { getGridCols } from '@/lib/gameUtils'
 
 export default function GameBoard({ answers, totalCount, revealedIds = new Set() }) {
   const cols = getGridCols(totalCount)
+  const rows = Math.ceil(totalCount / cols)
 
   return (
     <div
-      className="w-full h-full grid gap-1.5 content-start"
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      className="w-full h-full grid gap-1.5"
+      style={{
+        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+      }}
     >
       {answers.map((ans, idx) => {
         const revealed = revealedIds.has(ans.id)
@@ -16,8 +20,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
           : null
 
         return (
-          <div key={ans.id} className={`board-cell ${revealed ? 'revealed' : ''}`}
-               style={{ aspectRatio: '1' }}>
+          <div key={ans.id} className={`board-cell ${revealed ? 'revealed' : ''}`}>
             <div className="board-cell-inner">
               {/* Front: season label */}
               <div className="board-cell-front cell-shimmer border border-white/10 flex flex-col items-center justify-center p-1 text-center">
