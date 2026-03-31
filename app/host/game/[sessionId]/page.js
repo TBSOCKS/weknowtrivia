@@ -316,102 +316,100 @@ export default function GameSessionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col">
+    <div className="h-screen bg-brand-bg flex flex-col overflow-hidden">
       <NavBar />
 
-      <div className="flex-1 flex flex-col max-w-[1600px] mx-auto w-full px-4 py-4 gap-4">
+      {/* Full-height content below nav */}
+      <div className="flex-1 flex gap-3 px-3 py-3 min-h-0">
 
-        {/* Header bar */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-3xl text-white tracking-wide">
-              {session?.shows?.name} · LISTS
-            </h1>
-            <p className="text-brand-muted text-xs">
-              {revealedCount}/{totalAnswers} revealed · {gameMode === 'strike' ? '3-Strike Mode' : `Round Mode (${pickStyle})`}
-            </p>
+        {/* Board — fills all available space */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            <div>
+              <h1 className="font-display text-2xl text-white tracking-wide leading-none">
+                {session?.shows?.name} · LISTS
+              </h1>
+              <p className="text-brand-muted text-xs mt-0.5">
+                {revealedCount}/{totalAnswers} revealed · {gameMode === 'strike' ? '3-Strike' : `Round (${pickStyle})`}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {settings.timer_seconds && timeLeft !== null && (
+                <div className={`font-display text-4xl tracking-wider ${timeLeft <= 10 ? 'timer-low' : 'text-white'}`}>
+                  {formatTime(timeLeft)}
+                </div>
+              )}
+              <button
+                onClick={handleEndGame}
+                className="text-brand-muted hover:text-brand-red text-sm border border-brand-border hover:border-brand-red/40 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                End Game
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {/* Timer */}
-            {settings.timer_seconds && timeLeft !== null && (
-              <div className={`font-display text-5xl tracking-wider ${timeLeft <= 10 ? 'timer-low' : 'text-white'}`}>
-                {formatTime(timeLeft)}
+
+          {/* Board fills remaining height */}
+          <div className="flex-1 bg-brand-panel border border-brand-border rounded-2xl p-3 min-h-0 overflow-hidden">
+            {answers.length > 0 ? (
+              <GameBoard
+                answers={answers}
+                totalCount={totalAnswers}
+                revealedIds={revealedIds}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-brand-muted">
+                No answers loaded for this list.
               </div>
             )}
-            <button
-              onClick={handleEndGame}
-              className="text-brand-muted hover:text-brand-red text-sm border border-brand-border hover:border-brand-red/40 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              End Game
-            </button>
           </div>
         </div>
 
-        {/* Main layout: board + sidebar */}
-        <div className="flex-1 flex gap-4 min-h-0">
+        {/* Right sidebar: guess input + players */}
+        <div className="w-52 flex flex-col gap-3 flex-shrink-0 min-h-0">
 
-          {/* Board */}
-          <div className="flex-1 flex flex-col gap-4">
-            <div className="flex-1 bg-brand-panel border border-brand-border rounded-2xl p-4 overflow-auto">
-              {answers.length > 0 ? (
-                <GameBoard
-                  answers={answers}
-                  totalCount={totalAnswers}
-                  revealedIds={revealedIds}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-brand-muted">
-                  No answers loaded for this list.
-                </div>
-              )}
-            </div>
-
-            {/* Guess input */}
-            <div className="bg-brand-panel border border-brand-border rounded-2xl p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  {currentPicker && personalities[currentPicker.personality_id] && (
-                    <>
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-card">
-                        {personalities[currentPicker.personality_id].photo_url
-                          ? <img src={personalities[currentPicker.personality_id].photo_url} className="w-full h-full object-cover" alt="" />
-                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-sm">
-                              {personalities[currentPicker.personality_id].name?.[0]}
-                            </div>
-                        }
+          {/* Guess input */}
+          <div className="bg-brand-panel border border-brand-border rounded-2xl p-3 flex-shrink-0">
+            {/* Current picker */}
+            {currentPicker && personalities[currentPicker.personality_id] && (
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-card flex-shrink-0">
+                  {personalities[currentPicker.personality_id].photo_url
+                    ? <img src={personalities[currentPicker.personality_id].photo_url} className="w-full h-full object-cover" alt="" />
+                    : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs">
+                        {personalities[currentPicker.personality_id].name?.[0]}
                       </div>
-                      <span className="text-white text-sm font-medium">
-                        {personalities[currentPicker.personality_id].name?.split(' ')[0]}'s guess
-                      </span>
-                    </>
-                  )}
+                  }
                 </div>
+                <span className="text-white text-xs font-medium truncate">
+                  {personalities[currentPicker.personality_id].name?.split(' ')[0]}'s guess
+                </span>
               </div>
+            )}
 
-              <CastawaySearch
-                onSelect={handleGuess}
-                disabled={submitting || activePlayers.length === 0}
-                placeholder={submitting ? 'Processing…' : 'Type a castaway name to guess…'}
-              />
+            <CastawaySearch
+              onSelect={handleGuess}
+              disabled={submitting || activePlayers.length === 0}
+              placeholder={submitting ? 'Processing…' : 'Guess a castaway…'}
+            />
 
-              {/* Feedback */}
-              {feedback && (
-                <div className={`mt-3 px-4 py-2.5 rounded-xl font-display text-xl tracking-wide animate-slide-up ${
-                  feedback.type === 'correct'
-                    ? 'bg-brand-green/20 border border-brand-green/40 text-brand-green'
-                    : feedback.type === 'strike'
-                    ? 'bg-brand-red/20 border border-brand-red/40 text-brand-red'
-                    : 'bg-brand-border/40 border border-brand-border text-brand-muted'
-                }`}>
-                  {feedback.message}
-                </div>
-              )}
-            </div>
+            {/* Feedback */}
+            {feedback && (
+              <div className={`mt-2 px-3 py-2 rounded-xl font-display text-sm tracking-wide animate-slide-up ${
+                feedback.type === 'correct'
+                  ? 'bg-brand-green/20 border border-brand-green/40 text-brand-green'
+                  : feedback.type === 'strike'
+                  ? 'bg-brand-red/20 border border-brand-red/40 text-brand-red'
+                  : 'bg-brand-border/40 border border-brand-border text-brand-muted'
+              }`}>
+                {feedback.message}
+              </div>
+            )}
           </div>
 
-          {/* Player sidebar */}
-          <div className="w-44 flex flex-col gap-2 overflow-y-auto">
-            <div className="text-brand-muted text-xs uppercase tracking-widest mb-1 px-1">Players</div>
+          {/* Player cards — scrollable if needed */}
+          <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-h-0">
+            <div className="text-brand-muted text-xs uppercase tracking-widest px-1 flex-shrink-0">Players</div>
             {players.map(p => (
               <PlayerCard
                 key={p.id}
