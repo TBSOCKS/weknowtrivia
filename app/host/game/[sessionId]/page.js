@@ -27,7 +27,7 @@ export default function GameSessionPage() {
   const [timeLeft, setTimeLeft]         = useState(null)
   const timerRef                        = useRef(null)
 
-  // Load everything
+  // Initial full load
   const load = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
@@ -41,12 +41,10 @@ export default function GameSessionPage() {
     const playersData = playersRes.data ?? []
     setPlayers(playersData)
 
-    // Map personalities
     const pMap = {}
     playersData.forEach(p => { pMap[p.personality_id] = p.personalities })
     setPersonalities(pMap)
 
-    // Load answers for this list
     const listId = sess.settings?.list_id
     if (listId) {
       const { data: ansData } = await supabase
@@ -56,30 +54,41 @@ export default function GameSessionPage() {
         .order('position')
       setAnswers(ansData ?? [])
 
-      // Load which positions have been correctly guessed (from game_answers)
-      // We track revealed by checking game_answers with result='correct'
-      const { data: correctAnswers } = await supabase
-        .from('game_answers')
-        .select('answer_data, result')
-        .eq('result', 'correct')
-        .in('round_id',
-          (await supabase.from('game_rounds').select('id').eq('session_id', sessionId).then(r => r.data?.map(r => r.id) ?? []))
-        )
+      // Build revealedIds from DB on initial load only
+      const roundIds = await supabase
+        .from('game_rounds').select('id').eq('session_id', sessionId)
+        .then(r => r.data?.map(r => r.id) ?? [])
 
-      if (correctAnswers?.length) {
-        const revealed = new Set()
-        const ansMap = {}
-        ansData?.forEach(a => { ansMap[a.castaway_id] = a.id })
-        correctAnswers.forEach(ca => {
-          const cid = ca.answer_data?.castaway_id
-          if (cid && ansMap[cid]) revealed.add(ansMap[cid])
-        })
-        setRevealedIds(revealed)
-      }
+      const { data: correctAnswers } = roundIds.length
+        ? await supabase.from('game_answers').select('answer_data').eq('result', 'correct').in('round_id', roundIds)
+        : { data: [] }
+
+      const revealed = new Set()
+      const ansMap = {}
+      ansData?.forEach(a => { ansMap[a.castaway_id] = a.id })
+      ;(correctAnswers ?? []).forEach(ca => {
+        const cid = ca.answer_data?.castaway_id
+        if (cid && ansMap[cid]) revealed.add(ansMap[cid])
+      })
+      setRevealedIds(revealed)
     }
 
     setLoading(false)
   }, [sessionId, router])
+
+  // Reload only players/scores after each guess — never touches revealedIds
+  const reloadPlayers = useCallback(async () => {
+    const [sessRes, playersRes] = await Promise.all([
+      supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
+      supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
+    ])
+    if (sessRes.data) setSession(sessRes.data)
+    const playersData = playersRes.data ?? []
+    setPlayers(playersData)
+    const pMap = {}
+    playersData.forEach(p => { pMap[p.personality_id] = p.personalities })
+    setPersonalities(pMap)
+  }, [sessionId])
 
   useEffect(() => { load() }, [load])
 
@@ -237,8 +246,8 @@ export default function GameSessionPage() {
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
     }
 
-    // Reload fresh state
-    await load()
+    // Reload players only — revealedIds managed in state
+    await reloadPlayers()
     setSubmitting(false)
   }
 
