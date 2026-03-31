@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -14,7 +16,6 @@ export default function JoinCodePage() {
 
   useEffect(() => {
     async function load() {
-      // Find session by code — Lists has no code by default, but future modes will
       const { data: sess, error: sessErr } = await supabase
         .from('game_sessions')
         .select('*, shows(name)')
@@ -29,7 +30,6 @@ export default function JoinCodePage() {
       }
       setSession(sess)
 
-      // Load players
       const { data: playersData } = await supabase
         .from('session_players')
         .select('*, personalities(name, photo_url)')
@@ -37,7 +37,6 @@ export default function JoinCodePage() {
         .order('turn_order')
       setPlayers(playersData ?? [])
 
-      // Load answer progress
       const listId = sess.settings?.list_id
       if (listId) {
         const { count: total } = await supabase
@@ -51,7 +50,6 @@ export default function JoinCodePage() {
     }
     load()
 
-    // Realtime: watch session changes
     const channel = supabase
       .channel(`session-${code}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_sessions' }, () => load())
@@ -80,7 +78,6 @@ export default function JoinCodePage() {
 
   return (
     <div className="min-h-screen bg-brand-bg px-4 py-8">
-      {/* Header */}
       <div className="text-center mb-8">
         <div className="font-display text-5xl logo-gradient tracking-wide">WE KNOW TRIVIA</div>
         <div className="text-brand-muted text-sm mt-1 tracking-widest uppercase">
@@ -91,7 +88,6 @@ export default function JoinCodePage() {
         </div>
       </div>
 
-      {/* Status */}
       <div className="max-w-sm mx-auto">
         <div className="bg-brand-panel border border-brand-border rounded-2xl p-5 mb-4 text-center">
           <div className="text-brand-muted text-xs uppercase tracking-widest mb-1">Game Status</div>
@@ -115,7 +111,6 @@ export default function JoinCodePage() {
           )}
         </div>
 
-        {/* Scoreboard */}
         <div className="bg-brand-panel border border-brand-border rounded-2xl p-5">
           <div className="text-brand-muted text-xs uppercase tracking-widest mb-4">Scoreboard</div>
           <div className="flex flex-col gap-3">
