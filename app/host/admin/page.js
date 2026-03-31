@@ -10,10 +10,17 @@ const sections = [
     color: 'hover:border-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)]',
   },
   {
+    href:  '/host/admin/import',
+    icon:  '📥',
+    label: 'IMPORT CASTAWAYS',
+    desc:  'Bulk import all seasons & castaways from a CSV in one click',
+    color: 'hover:border-brand-amber hover:shadow-[0_0_20px_rgba(244,162,97,0.15)]',
+  },
+  {
     href:  '/host/admin/seasons',
     icon:  '📺',
     label: 'SHOWS & SEASONS',
-    desc:  'Add seasons and castaway rosters with placements',
+    desc:  'Manually add or edit seasons and castaway rosters',
     color: 'hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]',
   },
   {
