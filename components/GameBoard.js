@@ -43,7 +43,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-0.5 text-center">
                   <span className="text-white font-bold drop-shadow-md"
-                        style={{ fontSize: 'clamp(6px, 0.9vw, 11px)' }}>
+                        style={{ fontSize: 'clamp(9px, 1.3vw, 16px)' }}>
                     {ans.castaways?.name?.split(' ')[0]}
                   </span>
                 </div>
