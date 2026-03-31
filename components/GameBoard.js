@@ -37,7 +37,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                   <img
                     src={photoUrl}
                     alt={ans.castaways?.name}
-                    className="absolute w-[85%] h-[85%] object-cover rounded-full"
+                    className="absolute inset-0 w-full h-full object-cover"
                     style={{ objectPosition: 'center top' }}
                     onError={e => { e.target.style.display = 'none' }}
                   />

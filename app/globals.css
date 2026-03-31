@@ -62,7 +62,7 @@ body {
   inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  border-radius: 8px;
+  border-radius: 50%;
   overflow: hidden;
   transform: translateZ(0);
 }
