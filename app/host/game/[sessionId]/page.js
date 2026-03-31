@@ -416,18 +416,20 @@ export default function GameSessionPage() {
             )}
           </div>
 
-          {/* Player cards — scrollable if needed */}
-          <div className="flex-1 flex flex-col gap-2 overflow-y-auto min-h-0">
-            <div className="text-brand-muted text-xs uppercase tracking-widest px-1 flex-shrink-0">Players</div>
-            {players.map(p => (
-              <PlayerCard
-                key={p.id}
-                player={p}
-                personality={personalities[p.personality_id]}
-                isCurrentPicker={currentPicker?.id === p.id}
-                gameMode={gameMode}
-              />
-            ))}
+          {/* Player cards — 2 columns so up to 8 players fit without scrolling */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="text-brand-muted text-xs uppercase tracking-widest px-1 mb-2">Players</div>
+            <div className="grid grid-cols-2 gap-2">
+              {players.map(p => (
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  personality={personalities[p.personality_id]}
+                  isCurrentPicker={currentPicker?.id === p.id}
+                  gameMode={gameMode}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>

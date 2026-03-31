@@ -4,20 +4,27 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
   const strikes = player.strikes ?? 0
 
   return (
-    <div className={`relative bg-brand-panel border rounded-xl px-3 py-2.5 flex items-center gap-3 transition-all duration-300 ${
+    <div className={`relative bg-brand-panel border rounded-xl p-2 flex flex-col items-center gap-1.5 transition-all duration-300 ${
       player.eliminated
         ? 'border-brand-border opacity-40 grayscale'
         : isCurrentPicker
         ? 'border-brand-red picker-glow'
         : 'border-brand-border'
     }`}>
-      {/* Picking indicator — left stripe */}
+      {/* Picking / Eliminated badge */}
       {isCurrentPicker && !player.eliminated && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-red rounded-l-xl" />
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-red text-white text-[9px] font-display tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap">
+          PICKING
+        </div>
+      )}
+      {player.eliminated && (
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-border text-brand-muted text-[9px] font-display tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap">
+          OUT
+        </div>
       )}
 
-      {/* Photo */}
-      <div className="w-10 h-10 rounded-full overflow-hidden bg-brand-card border border-brand-border flex-shrink-0">
+      {/* Circular photo */}
+      <div className="w-11 h-11 rounded-full overflow-hidden bg-brand-card border-2 border-brand-border flex-shrink-0 mt-1">
         {personality?.photo_url ? (
           <img src={personality.photo_url} alt={personality.name} className="w-full h-full object-cover" />
         ) : (
@@ -27,31 +34,23 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
         )}
       </div>
 
-      {/* Name + strikes */}
-      <div className="flex-1 min-w-0">
-        <div className="text-white text-sm font-medium truncate leading-tight">
-          {personality?.name?.split(' ')[0] ?? 'Player'}
-        </div>
-        {player.eliminated && (
-          <div className="text-brand-red text-[10px] uppercase tracking-wide">Eliminated</div>
-        )}
-        {!player.eliminated && gameMode === 'strike' && (
-          <div className="flex gap-1 mt-0.5">
-            {[1, 2, 3].map(n => (
-              <div key={n} className={`strike-dot ${n <= strikes ? 'active' : ''}`} />
-            ))}
-          </div>
-        )}
-        {isCurrentPicker && !player.eliminated && (
-          <div className="text-brand-red text-[10px] font-display tracking-widest uppercase">Picking</div>
-        )}
+      {/* Name */}
+      <div className="text-white text-xs font-medium text-center leading-tight truncate w-full px-1">
+        {personality?.name?.split(' ')[0] ?? 'Player'}
       </div>
 
       {/* Score */}
-      <div className="text-right flex-shrink-0">
-        <div className="font-display text-3xl text-white leading-none">{player.score ?? 0}</div>
-        <div className="text-brand-muted text-[10px]">pts</div>
-      </div>
+      <div className="font-display text-3xl text-white leading-none">{player.score ?? 0}</div>
+      <div className="text-brand-muted text-[10px] -mt-1">pts</div>
+
+      {/* Strikes */}
+      {gameMode === 'strike' && !player.eliminated && (
+        <div className="flex gap-1">
+          {[1, 2, 3].map(n => (
+            <div key={n} className={`strike-dot ${n <= strikes ? 'active' : ''}`} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
