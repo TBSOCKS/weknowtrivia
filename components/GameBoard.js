@@ -30,16 +30,17 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                 </span>
               </div>
 
-              {/* Back: castaway photo */}
-              <div className="board-cell-back bg-brand-card border border-brand-green/60 overflow-hidden relative">
-                {photoUrl && (
-                  <img
-                    src={photoUrl}
-                    alt={ans.castaways?.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={e => { e.target.style.display = 'none' }}
-                  />
-                )}
+              {/* Back: castaway photo — use background-image so circular PNGs fill the square */}
+              <div
+                className="board-cell-back border border-brand-green/60 overflow-hidden relative"
+                style={{
+                  backgroundColor: '#1a1a20',
+                  backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center top',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-0.5 text-center">
                   <span className="text-white font-bold drop-shadow-md"
