@@ -241,11 +241,21 @@ export default function GameSessionPage() {
           const totalPlayers = players.filter(p => !p.eliminated).length
           const totalGuesses = settings.total_rounds * totalPlayers
           if (newGuessCount >= totalGuesses) {
-            await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-            await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
-            setWinner(sorted[0])
-            setGameOver(true)
+            const topScore = sorted[0].score ?? 0
+            const tied = sorted.filter(p => (p.score ?? 0) === topScore)
+            if (tied.length > 1) {
+              await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+              setSuddenDeath(true)
+              setSdPlayers(tied.map(p => p.id))
+              setSdGuessCount(0)
+              setSdRoundMisses(0)
+            } else {
+              await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+              await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
+              setWinner(sorted[0])
+              setGameOver(true)
+            }
           }
         }
       }
@@ -310,11 +320,21 @@ export default function GameSessionPage() {
         const totalPlayers = players.filter(p => !p.eliminated).length
         const totalGuesses = settings.total_rounds * totalPlayers
         if (newGuessCount >= totalGuesses) {
-          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
           const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          await saveLeaderboard(players, sorted[0])
-          setWinner(sorted[0])
-          setGameOver(true)
+          const topScore = sorted[0].score ?? 0
+          const tied = sorted.filter(p => (p.score ?? 0) === topScore)
+          if (tied.length > 1) {
+            await supabase.from('game_sessions').update({ settings: { ...settings, guess_count: newGuessCount } }).eq('id', sessionId)
+            setSuddenDeath(true)
+            setSdPlayers(tied.map(p => p.id))
+            setSdGuessCount(0)
+            setSdRoundMisses(0)
+          } else {
+            await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+            await saveLeaderboard(players, sorted[0])
+            setWinner(sorted[0])
+            setGameOver(true)
+          }
         }
       }
 
