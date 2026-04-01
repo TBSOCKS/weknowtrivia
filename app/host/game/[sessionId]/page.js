@@ -517,8 +517,20 @@ export default function GameSessionPage() {
     }
 
     if (isOver) {
+      const sorted   = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      const topScore = sorted[0].score ?? 0
+      const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
+
+      if (tied.length > 1) {
+        // Tie — go to sudden death instead of ending
+        setSuddenDeath(true)
+        setSdPlayers(tied.map(p => p.id))
+        setSdGuessCount(0)
+        setSdCorrect(new Set())
+        return true
+      }
+
       await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-      const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       await saveLeaderboard(updatedPlayers, sorted[0])
       setWinner(sorted[0])
       setGameOver(true)
