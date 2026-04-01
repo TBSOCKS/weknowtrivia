@@ -193,13 +193,16 @@ export default function GameSessionPage() {
             setSdPlayers(tied.map(p => p.id))
             setSdGuessCount(0)
             setSdCorrect(new Set())
+            setLastTurnUndo(null)
+            await reloadPlayers()
+            if (s.timer_seconds) resetTimer(s.timer_seconds)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(freshPlayers, sorted[0])
             setWinner(sorted[0])
             setGameOver(true)
+            await reloadPlayers()
           }
-          await reloadPlayers()
           return
         }
       }
@@ -835,7 +838,7 @@ export default function GameSessionPage() {
                 ↩ Undo timer strike
               </button>
             )}
-            {lastTurnUndo && (
+            {lastTurnUndo && !suddenDeath && (
               <button onClick={undoTurnAdvance}
                 className="mt-1.5 w-full text-xs text-brand-amber hover:text-amber-400 border border-brand-amber/30 hover:border-brand-amber/60 rounded-lg py-1 transition-colors">
                 ↩ Undo turn advance
