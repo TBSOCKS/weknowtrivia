@@ -1,11 +1,11 @@
 'use client'
 
-export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder }) {
+export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder, inSuddenDeath }) {
   const strikes = player.strikes ?? 0
 
   return (
     <div className={`relative bg-brand-panel border rounded-xl p-2 flex flex-col items-center gap-1.5 transition-all duration-300 ${
-      player.eliminated
+      player.eliminated && !inSuddenDeath
         ? 'border-brand-border opacity-40 grayscale'
         : isCurrentPicker
         ? 'border-brand-red picker-glow'

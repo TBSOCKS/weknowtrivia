@@ -739,6 +739,7 @@ export default function GameSessionPage() {
                   isCurrentPicker={effectivePicker?.id === p.id}
                   gameMode={gameMode}
                   turnOrder={p.turn_order}
+                  inSuddenDeath={suddenDeath && sdPlayers.includes(p.id)}
                 />
               ))}
             </div>
