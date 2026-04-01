@@ -303,7 +303,9 @@ export default function BootOrderGamePage() {
   }
 
   async function saveLeaderboard(allPlayers, winnerPlayer) {
-    if (!session?.settings?.track_leaderboard) return
+    const { data: freshSess } = await supabase
+      .from('game_sessions').select('*').eq('id', sessionId).single()
+    if (!freshSess?.settings?.track_leaderboard) return
     for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
       const addPoints = p.score ?? 0
@@ -312,7 +314,7 @@ export default function BootOrderGamePage() {
         .from('leaderboard')
         .select('*')
         .eq('personality_id', p.personality_id)
-        .eq('show_id', session.show_id)
+        .eq('show_id', freshSess.show_id)
         .eq('mode', 'boot_order')
         .single()
 

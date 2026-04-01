@@ -326,9 +326,12 @@ export default function GameSessionPage() {
 
   // Save leaderboard if tracking is enabled
   async function saveLeaderboard(allPlayers, winnerPlayer) {
-    if (!session?.settings?.track_leaderboard) return
-    const showId = session.show_id
-    const mode   = session.mode
+    // Fetch fresh session to ensure we have latest settings
+    const { data: freshSess } = await supabase
+      .from('game_sessions').select('*').eq('id', sessionId).single()
+    if (!freshSess?.settings?.track_leaderboard) return
+    const showId = freshSess.show_id
+    const mode   = freshSess.mode
     for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
       const addPoints = p.score ?? 0
