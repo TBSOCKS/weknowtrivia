@@ -330,27 +330,37 @@ export default function GameSessionPage() {
     const showId = session.show_id
     const mode   = session.mode
     for (const p of allPlayers) {
-      await supabase.from('leaderboard').upsert({
-        personality_id: p.personality_id,
-        show_id:        showId,
-        mode,
-        games_played:   1,
-        wins:           p.id === winnerPlayer?.id ? 1 : 0,
-        total_points:   p.score ?? 0,
-      }, {
-        onConflict: 'personality_id,show_id,mode',
-        ignoreDuplicates: false,
-      }).then(async () => {
-        // Increment rather than overwrite
-        await supabase.rpc('increment_leaderboard', {
-          p_personality_id: p.personality_id,
-          p_show_id:        showId,
-          p_mode:           mode,
-          p_games:          1,
-          p_wins:           p.id === winnerPlayer?.id ? 1 : 0,
-          p_points:         p.score ?? 0,
-        }).catch(() => {})
-      })
+      const isWinner  = p.id === winnerPlayer?.id
+      const addPoints = p.score ?? 0
+
+      // Check if record exists
+      const { data: existing } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .eq('personality_id', p.personality_id)
+        .eq('show_id', showId)
+        .eq('mode', mode)
+        .single()
+
+      if (existing) {
+        // Increment existing record
+        await supabase.from('leaderboard').update({
+          games_played: existing.games_played + 1,
+          wins:         existing.wins + (isWinner ? 1 : 0),
+          total_points: existing.total_points + addPoints,
+          updated_at:   new Date().toISOString(),
+        }).eq('id', existing.id)
+      } else {
+        // Insert new record
+        await supabase.from('leaderboard').insert({
+          personality_id: p.personality_id,
+          show_id:        showId,
+          mode,
+          games_played:   1,
+          wins:           isWinner ? 1 : 0,
+          total_points:   addPoints,
+        })
+      }
     }
   }
 

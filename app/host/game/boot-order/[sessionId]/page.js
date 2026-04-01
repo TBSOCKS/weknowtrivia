@@ -305,14 +305,34 @@ export default function BootOrderGamePage() {
   async function saveLeaderboard(allPlayers, winnerPlayer) {
     if (!session?.settings?.track_leaderboard) return
     for (const p of allPlayers) {
-      await supabase.from('leaderboard').upsert({
-        personality_id: p.personality_id,
-        show_id:        session.show_id,
-        mode:           'boot_order',
-        games_played:   1,
-        wins:           p.id === winnerPlayer?.id ? 1 : 0,
-        total_points:   p.score ?? 0,
-      }, { onConflict: 'personality_id,show_id,mode' }).catch(() => {})
+      const isWinner  = p.id === winnerPlayer?.id
+      const addPoints = p.score ?? 0
+
+      const { data: existing } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .eq('personality_id', p.personality_id)
+        .eq('show_id', session.show_id)
+        .eq('mode', 'boot_order')
+        .single()
+
+      if (existing) {
+        await supabase.from('leaderboard').update({
+          games_played: existing.games_played + 1,
+          wins:         existing.wins + (isWinner ? 1 : 0),
+          total_points: existing.total_points + addPoints,
+          updated_at:   new Date().toISOString(),
+        }).eq('id', existing.id)
+      } else {
+        await supabase.from('leaderboard').insert({
+          personality_id: p.personality_id,
+          show_id:        session.show_id,
+          mode:           'boot_order',
+          games_played:   1,
+          wins:           isWinner ? 1 : 0,
+          total_points:   addPoints,
+        })
+      }
     }
   }
 
