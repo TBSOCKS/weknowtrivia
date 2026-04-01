@@ -154,6 +154,13 @@ export default function GameSessionPage() {
   const guessCount   = settings.guess_count ?? 0
   const currentPicker = getCurrentPicker(players, guessCount, pickStyle)
 
+  // During sudden death, override the current picker
+  const sdActive = suddenDeath ? players.filter(p => sdPlayers.includes(p.id)) : []
+  const sdCurrentPicker = suddenDeath && sdActive.length > 0
+    ? sdActive[sdGuessCount % sdActive.length]
+    : null
+  const effectivePicker = suddenDeath ? sdCurrentPicker : currentPicker
+
   const activePlayers  = players.filter(p => !p.eliminated)
   const totalAnswers   = answers.length
   const revealedCount  = revealedIds.size
@@ -660,18 +667,18 @@ export default function GameSessionPage() {
           {/* Guess input */}
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-3 flex-shrink-0">
             {/* Current picker */}
-            {currentPicker && personalities[currentPicker.personality_id] && (
+            {!suddenDeath && effectivePicker && personalities[effectivePicker.personality_id] && (
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-card flex-shrink-0">
-                  {personalities[currentPicker.personality_id].photo_url
-                    ? <img src={personalities[currentPicker.personality_id].photo_url} className="w-full h-full object-cover" alt="" />
+                  {personalities[effectivePicker.personality_id].photo_url
+                    ? <img src={personalities[effectivePicker.personality_id].photo_url} className="w-full h-full object-cover" alt="" />
                     : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs">
-                        {personalities[currentPicker.personality_id].name?.[0]}
+                        {personalities[effectivePicker.personality_id].name?.[0]}
                       </div>
                   }
                 </div>
                 <span className="text-white text-xs font-medium truncate">
-                  {personalities[currentPicker.personality_id].name?.split(' ')[0]}'s guess
+                  {personalities[effectivePicker.personality_id].name?.split(' ')[0]}'s guess
                 </span>
               </div>
             )}
@@ -717,7 +724,7 @@ export default function GameSessionPage() {
                   key={p.id}
                   player={p}
                   personality={personalities[p.personality_id]}
-                  isCurrentPicker={currentPicker?.id === p.id}
+                  isCurrentPicker={effectivePicker?.id === p.id}
                   gameMode={gameMode}
                   turnOrder={p.turn_order}
                 />
