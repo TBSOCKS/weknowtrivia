@@ -26,7 +26,7 @@ export default function GameSessionPage() {
   const [suddenDeath, setSuddenDeath]   = useState(false)
   const [sdPlayers, setSdPlayers]       = useState([])
   const [sdGuessCount, setSdGuessCount] = useState(0)
-  const [sdRoundMisses, setSdRoundMisses] = useState(0)
+  const [sdCorrect, setSdCorrect]       = useState(new Set()) // player ids correct this SD round
 
   // Timer
   const [timeLeft, setTimeLeft]         = useState(null)
@@ -395,6 +395,8 @@ export default function GameSessionPage() {
   }
 
   // Handle a sudden death guess
+  // Logic: everyone gets one guess per round. Correct = survive. Wrong = eliminated.
+  // After all SD players have guessed: 1 survivor → wins; 2+ survive → continue between them; 0 survive → everyone gets another round.
   async function handleSuddenDeathGuess(castaway) {
     if (submitting) return
     setSubmitting(true)
@@ -402,55 +404,76 @@ export default function GameSessionPage() {
 
     const sdActive = players.filter(p => sdPlayers.includes(p.id))
     const sdPicker = sdActive[sdGuessCount % sdActive.length]
+    const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
 
-    const matchedAnswer = answers.find(
-      a => a.castaway_id === castaway.id && !revealedIds.has(a.id)
-    )
+    if (isAlreadyRevealed) {
+      setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
+      setSubmitting(false)
+      return
+    }
+
+    const matchedAnswer = answers.find(a => a.castaway_id === castaway.id && !revealedIds.has(a.id))
+    const newGuessCount = sdGuessCount + 1
+    const isLastInRound = newGuessCount % sdActive.length === 0
 
     if (matchedAnswer) {
-      // Correct — this player wins
+      // Correct — reveal it, award point, mark as survivor for this round
       const newRevealed = new Set(revealedIds)
       newRevealed.add(matchedAnswer.id)
       setRevealedIds(newRevealed)
       await supabase.from('session_players')
         .update({ score: (sdPicker.score ?? 0) + 1 })
         .eq('id', sdPicker.id)
-      await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-      const updatedPlayers = players.map(p => p.id === sdPicker.id ? { ...p, score: (p.score ?? 0) + 1 } : p)
-      await saveLeaderboard(updatedPlayers, sdPicker)
-      setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${sdPicker.personalities?.name?.split(' ')[0]} wins!` })
-      setSuddenDeath(false)
-      setWinner(sdPicker)
-      setGameOver(true)
-    } else {
-      // Wrong — eliminate from SD if not already guessed in this round
-      const newGuessCount = sdGuessCount + 1
-      const newMisses     = sdRoundMisses + 1
-      const sdActive      = players.filter(p => sdPlayers.includes(p.id))
+      const newCorrect = new Set([...sdCorrect, sdPicker.id])
+      setSdCorrect(newCorrect)
+      setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${sdPicker.personalities?.name?.split(' ')[0]} survives!` })
+      setSdGuessCount(newGuessCount)
 
-      setFeedback({ type: 'wrong', message: `✗ Wrong! ${sdPicker.personalities?.name?.split(' ')[0]} is out of sudden death!` })
-
-      // If this completes a full round of misses — everyone missed, continue
-      if (newMisses >= sdActive.length) {
-        setSdGuessCount(newGuessCount)
-        setSdRoundMisses(0)
-        setFeedback({ type: 'wrong', message: '✗ Everyone missed — sudden death continues!' })
-      } else {
-        // Remove this player from sudden death
-        const remaining = sdPlayers.filter(id => id !== sdPicker.id)
-        if (remaining.length === 1) {
-          // One survivor — they win
-          const winnerPlayer = players.find(p => p.id === remaining[0])
+      if (isLastInRound) {
+        // Round over — check survivors
+        const survivors = sdActive.filter(p => newCorrect.has(p.id))
+        if (survivors.length === 1) {
+          // One survivor wins
+          const winnerPlayer = survivors[0]
+          const updatedPlayers = players.map(p => p.id === winnerPlayer.id ? { ...p, score: (p.score ?? 0) + 1 } : p)
           await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-          await saveLeaderboard(players, winnerPlayer)
-          setFeedback({ type: 'correct', message: `${personalities[winnerPlayer?.personality_id]?.name?.split(' ')[0]} wins sudden death!` })
+          await saveLeaderboard(updatedPlayers, winnerPlayer)
           setSuddenDeath(false)
           setWinner(winnerPlayer)
           setGameOver(true)
         } else {
-          setSdPlayers(remaining)
-          setSdGuessCount(newGuessCount)
-          setSdRoundMisses(newMisses)
+          // Multiple survivors — continue SD between them
+          setSdPlayers(survivors.map(p => p.id))
+          setSdCorrect(new Set())
+          setSdGuessCount(0)
+          setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
+        }
+      }
+    } else {
+      // Wrong — eliminated from SD (no point awarded)
+      setFeedback({ type: 'wrong', message: `✗ Wrong! ${sdPicker.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
+      setSdGuessCount(newGuessCount)
+
+      if (isLastInRound) {
+        // Round over — check survivors
+        const survivors = sdActive.filter(p => sdCorrect.has(p.id))
+        if (survivors.length === 0) {
+          // Everyone missed — reset and continue with all current SD players
+          setSdCorrect(new Set())
+          setSdGuessCount(0)
+          setFeedback({ type: 'wrong', message: '✗ Everyone missed — sudden death continues!' })
+        } else if (survivors.length === 1) {
+          const winnerPlayer = survivors[0]
+          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+          await saveLeaderboard(players, winnerPlayer)
+          setSuddenDeath(false)
+          setWinner(winnerPlayer)
+          setGameOver(true)
+        } else {
+          setSdPlayers(survivors.map(p => p.id))
+          setSdCorrect(new Set())
+          setSdGuessCount(0)
+          setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
         }
       }
     }
@@ -579,7 +602,8 @@ export default function GameSessionPage() {
                 {session?.shows?.name} · LISTS
               </h1>
               <p className="text-brand-muted text-xs mt-0.5">
-                {revealedCount}/{totalAnswers} revealed · {gameMode === 'strike' ? '3-Strike' : `Round (${pickStyle})`}
+                {revealedCount}/{totalAnswers} revealed ·{' '}
+                {suddenDeath ? '⚡ SUDDEN DEATH' : gameMode === 'strike' ? '3-Strike' : `Round ${Math.min(Math.floor(guessCount / Math.max(players.filter(p=>!p.eliminated).length,1)) + 1, settings.total_rounds ?? 99)} of ${settings.total_rounds ?? '?'} (${pickStyle})`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -644,10 +668,22 @@ export default function GameSessionPage() {
               </div>
             )}
 
+            {suddenDeath && (
+              <div className="mb-2 px-3 py-2 bg-brand-red/20 border border-brand-red/50 rounded-xl text-center">
+                <div className="font-display text-base text-brand-red tracking-wide">⚡ SUDDEN DEATH</div>
+                {(() => {
+                  const sdActive = players.filter(p => sdPlayers.includes(p.id))
+                  const picker = sdActive[sdGuessCount % Math.max(sdActive.length, 1)]
+                  const name = personalities[picker?.personality_id]?.name?.split(' ')[0]
+                  return <div className="text-brand-muted text-xs mt-0.5">{name}'s guess{sdCorrect.size > 0 ? ` · ${sdCorrect.size} survived` : ''}</div>
+                })()}
+              </div>
+            )}
+
             <CastawaySearch
-              onSelect={handleGuess}
-              disabled={submitting || activePlayers.length === 0}
-              placeholder={submitting ? 'Processing…' : 'Guess a castaway…'}
+              onSelect={suddenDeath ? handleSuddenDeathGuess : handleGuess}
+              disabled={submitting || (!suddenDeath && activePlayers.length === 0)}
+              placeholder={submitting ? 'Processing…' : suddenDeath ? 'Sudden death guess…' : 'Guess a castaway…'}
             />
 
             {/* Feedback */}
