@@ -25,7 +25,9 @@ export default function GameSessionPage() {
 
   // Timer
   const [timeLeft, setTimeLeft]         = useState(null)
+  const [paused, setPaused]             = useState(false)
   const timerRef                        = useRef(null)
+  const pausedRef                       = useRef(false)
 
   // Initial full load
   const load = useCallback(async () => {
@@ -101,16 +103,39 @@ export default function GameSessionPage() {
 
   function resetTimer(seconds) {
     clearInterval(timerRef.current)
+    pausedRef.current = false
+    setPaused(false)
     setTimeLeft(seconds)
     timerRef.current = setInterval(() => {
+      if (pausedRef.current) return
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current)
+          // Advance turn on timeout
+          advanceTurnOnTimeout()
           return 0
         }
         return prev - 1
       })
     }, 1000)
+  }
+
+  function togglePause() {
+    pausedRef.current = !pausedRef.current
+    setPaused(pausedRef.current)
+  }
+
+  async function advanceTurnOnTimeout() {
+    // Increment guess count to skip to next picker, no strike
+    const sess = await supabase.from('game_sessions').select('settings').eq('id', sessionId).single()
+    if (!sess.data) return
+    const s = sess.data.settings ?? {}
+    const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
+    await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+    await reloadPlayers()
+    // Restart timer
+    const secs = s.timer_seconds
+    if (secs) resetTimer(secs)
   }
 
   // Derived state
@@ -182,6 +207,14 @@ export default function GameSessionPage() {
         setWinner(sorted[0])
       } else {
         await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+        // After a correct guess, also check mathematical game-over in strike mode
+        if (gameMode === 'strike') {
+          const updatedPlayers = players.map(p =>
+            p.id === currentPicker?.id ? { ...p, score: (p.score ?? 0) + 1 } : p
+          )
+          const remaining = totalAnswers - newRevealed.size
+          await checkStrikeGameOver(updatedPlayers, remaining)
+        }
       }
 
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
@@ -235,37 +268,8 @@ export default function GameSessionPage() {
             ? { ...p, strikes: (p.strikes ?? 0) + 1, eliminated: (p.strikes ?? 0) + 1 >= 3 }
             : p
         )
-        const stillActive = updatedPlayers.filter(p => !p.eliminated)
         const remaining = totalAnswers - revealedIds.size
-
-        // Game over when: all eliminated, or only 1 left and they lead, 
-        // or leader's gap over 2nd place > remaining answers
-        let isOver = false
-        if (stillActive.length === 0) {
-          isOver = true
-        } else if (stillActive.length === 1) {
-          // Only 1 active — check if they can be caught
-          const activePlayer = stillActive[0]
-          const eliminated = updatedPlayers.filter(p => p.eliminated)
-          const topElimScore = Math.max(0, ...eliminated.map(p => p.score ?? 0))
-          // Game over if active player can't be beaten even if they miss all remaining
-          if ((activePlayer.score ?? 0) > topElimScore) isOver = true
-          // Or if no eliminated players, they're last one standing
-          if (eliminated.length === 0) isOver = true
-        } else {
-          // Multiple active — check if leader's lead is mathematically insurmountable
-          const sorted = [...stillActive].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          const leader = sorted[0]
-          const second = sorted[1]
-          if ((leader.score ?? 0) - (second.score ?? 0) > remaining) isOver = true
-        }
-
-        if (isOver) {
-          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-          setGameOver(true)
-          const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          setWinner(sorted[0])
-        }
+        await checkStrikeGameOver(updatedPlayers, remaining)
       }
 
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
@@ -274,6 +278,35 @@ export default function GameSessionPage() {
     // Reload players only — revealedIds managed in state
     await reloadPlayers()
     setSubmitting(false)
+  }
+
+  // Check if strike game is mathematically over given a player snapshot
+  async function checkStrikeGameOver(updatedPlayers, remainingAnswers) {
+    const stillActive = updatedPlayers.filter(p => !p.eliminated)
+    const eliminated  = updatedPlayers.filter(p => p.eliminated)
+    let isOver = false
+
+    if (stillActive.length === 0) {
+      isOver = true
+    } else if (stillActive.length === 1) {
+      const active = stillActive[0]
+      // Only 1 player left — if they already lead, game over
+      // If no eliminated players yet, they're last standing
+      const topElim = eliminated.length > 0 ? Math.max(...eliminated.map(p => p.score ?? 0)) : -1
+      if (eliminated.length === 0 || (active.score ?? 0) > topElim) isOver = true
+    } else {
+      // Multiple active — leader's gap > remaining = insurmountable
+      const sorted = [...stillActive].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      if ((sorted[0].score ?? 0) - (sorted[1].score ?? 0) > remainingAnswers) isOver = true
+    }
+
+    if (isOver) {
+      await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+      const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      setWinner(sorted[0])
+      setGameOver(true)
+    }
+    return isOver
   }
 
   async function handleEndGame() {
@@ -350,7 +383,7 @@ export default function GameSessionPage() {
   }
 
   return (
-    <div className="h-screen bg-brand-bg flex flex-col overflow-hidden">
+    <div className="h-screen bg-brand-bg flex flex-col overflow-hidden relative">
       <NavBar />
 
       {/* Full-height content below nav */}
@@ -370,9 +403,17 @@ export default function GameSessionPage() {
             </div>
             <div className="flex items-center gap-3">
               {settings.timer_seconds && timeLeft !== null && (
-                <div className={`font-display text-4xl tracking-wider ${timeLeft <= 10 ? 'timer-low' : 'text-white'}`}>
-                  {formatTime(timeLeft)}
-                </div>
+                <>
+                  <div className={`font-display text-4xl tracking-wider ${timeLeft <= 10 && !paused ? 'timer-low' : 'text-white'}`}>
+                    {paused ? <span className="text-brand-amber">PAUSED</span> : formatTime(timeLeft)}
+                  </div>
+                  <button
+                    onClick={togglePause}
+                    className={`text-sm border px-3 py-1.5 rounded-lg transition-colors ${paused ? 'border-brand-amber text-brand-amber hover:bg-brand-amber/10' : 'border-brand-border text-brand-muted hover:text-white'}`}
+                  >
+                    {paused ? '▶ Resume' : '⏸ Pause'}
+                  </button>
+                </>
               )}
               <button
                 onClick={handleEndGame}
@@ -459,6 +500,20 @@ export default function GameSessionPage() {
           </div>
         </div>
       </div>
+
+      {/* Pause overlay */}
+      {paused && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center"
+             style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(12,12,15,0.7)' }}>
+          <div className="text-center">
+            <div className="font-display text-9xl text-brand-amber tracking-widest drop-shadow-2xl">PAUSED</div>
+            <button onClick={togglePause}
+                    className="mt-6 bg-brand-amber hover:bg-amber-500 text-brand-bg font-display text-3xl tracking-widest px-10 py-4 rounded-2xl transition-colors">
+              ▶ RESUME
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
