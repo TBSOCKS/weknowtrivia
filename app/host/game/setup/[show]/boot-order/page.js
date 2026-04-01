@@ -173,15 +173,7 @@ export default function BootOrderSetupPage() {
                   placeholder={`Add player ${selectedPlayers.filter(Boolean).length + 1}…`}
                 />
               )}
-                      <select value={pid} onChange={e => setPlayer(idx, e.target.value)}
-                        className="flex-1 bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-red transition-colors text-sm">
-                        <option value="">— Player {idx + 1} —</option>
-                        {availableFor(idx).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                    </div>
-                  )
-                })}
-              </div>
+
             </div>
 
             {/* Season pool */}
