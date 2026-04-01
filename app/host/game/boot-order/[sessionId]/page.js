@@ -327,17 +327,28 @@ export default function BootOrderGamePage() {
     const { data: freshSess } = await supabase
       .from('game_sessions').select('*').eq('id', sessionId).single()
     if (!freshSess?.settings?.track_leaderboard) return
+    const showId = freshSess.show_id
+
     for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
       const addPoints = p.score ?? 0
 
+      // Write per-session row for deletable history
+      await supabase.from('leaderboard_sessions').insert({
+        session_id:     sessionId,
+        personality_id: p.personality_id,
+        show_id:        showId,
+        mode:           'boot_order',
+        score:          addPoints,
+        won:            isWinner,
+      })
+
       const { data: existing } = await supabase
-        .from('leaderboard')
-        .select('*')
+        .from('leaderboard').select('*')
         .eq('personality_id', p.personality_id)
-        .eq('show_id', freshSess.show_id)
+        .eq('show_id', showId)
         .eq('mode', 'boot_order')
-        .single()
+        .maybeSingle()
 
       if (existing) {
         await supabase.from('leaderboard').update({
@@ -349,7 +360,7 @@ export default function BootOrderGamePage() {
       } else {
         await supabase.from('leaderboard').insert({
           personality_id: p.personality_id,
-          show_id:        session.show_id,
+          show_id:        showId,
           mode:           'boot_order',
           games_played:   1,
           wins:           isWinner ? 1 : 0,
