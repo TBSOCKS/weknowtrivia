@@ -1,6 +1,6 @@
 'use client'
 
-export default function PlayerCard({ player, personality, isCurrentPicker, gameMode }) {
+export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder }) {
   const strikes = player.strikes ?? 0
 
   return (
@@ -34,10 +34,15 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
         )}
       </div>
 
-      {/* Name */}
+      {/* Name + turn order */}
       <div className="text-white text-xs font-medium text-center leading-tight truncate w-full px-1">
         {personality?.name?.split(' ')[0] ?? 'Player'}
       </div>
+      {turnOrder != null && (
+        <div className="text-brand-muted text-[9px] uppercase tracking-widest -mt-1">
+          Turn {turnOrder}
+        </div>
+      )}
 
       {/* Score */}
       <div className="font-display text-3xl text-white leading-none">{player.score ?? 0}</div>
