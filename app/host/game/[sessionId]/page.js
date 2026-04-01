@@ -224,7 +224,6 @@ export default function GameSessionPage() {
           setSuddenDeath(true)
           setSdPlayers(tied.map(p => p.id))
           setSdGuessCount(0)
-          setSdRoundMisses(0)
         } else {
           await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
           await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -253,7 +252,6 @@ export default function GameSessionPage() {
               setSuddenDeath(true)
               setSdPlayers(tied.map(p => p.id))
               setSdGuessCount(0)
-              setSdRoundMisses(0)
             } else {
               await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
               await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -332,7 +330,6 @@ export default function GameSessionPage() {
             setSuddenDeath(true)
             setSdPlayers(tied.map(p => p.id))
             setSdGuessCount(0)
-            setSdRoundMisses(0)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(players, sorted[0])
