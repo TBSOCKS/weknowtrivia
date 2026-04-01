@@ -384,7 +384,7 @@ export default function GameSessionPage() {
           </div>
 
           {/* Board fills remaining height */}
-          <div className="flex-1 bg-brand-panel border border-brand-border rounded-2xl p-3 min-h-0 overflow-hidden">
+          <div className="flex-1 border border-brand-border rounded-2xl p-3 min-h-0 overflow-hidden" style={{ background: '#0a0a10' }}>
             {answers.length > 0 ? (
               <GameBoard
                 answers={answers}
