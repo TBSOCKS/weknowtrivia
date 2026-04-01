@@ -12,15 +12,15 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    // Size cells based purely on available HEIGHT — width will follow
     const obs = new ResizeObserver(([entry]) => {
-      const { height } = entry.contentRect
+      const { height, width } = entry.contentRect
       const byH = (height - GAP * (rows - 1)) / rows
-      setCellSize(Math.floor(byH))
+      const byW = (width - GAP * (cols - 1)) / cols
+      setCellSize(Math.floor(Math.min(byH, byW)))
     })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [rows])
+  }, [rows, cols])
 
   const gridWidth = cellSize > 0 ? cellSize * cols + GAP * (cols - 1) : 0
 
