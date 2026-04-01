@@ -61,6 +61,10 @@ export default function GameSessionPage() {
         .order('position')
       setAnswers(ansData ?? [])
 
+      // Load list title
+      const { data: listData } = await supabase.from('lists').select('title').eq('id', listId).single()
+      if (listData?.title) setListTitle(listData.title)
+
       // Build revealedIds from DB on initial load only
       const roundIds = await supabase
         .from('game_rounds').select('id').eq('session_id', sessionId)
@@ -401,6 +405,7 @@ export default function GameSessionPage() {
     if (submitting) return
     setSubmitting(true)
     setFeedback(null)
+    try {
 
     const sdActive = players.filter(p => sdPlayers.includes(p.id))
     const sdPicker = sdActive[sdGuessCount % sdActive.length]
@@ -479,7 +484,12 @@ export default function GameSessionPage() {
     }
 
     await reloadPlayers()
-    setSubmitting(false)
+    } catch (err) {
+      console.error('SD error:', err)
+      setFeedback({ type: 'wrong', message: 'Something went wrong — try again.' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // Check if strike game is mathematically over given a player snapshot
@@ -601,6 +611,7 @@ export default function GameSessionPage() {
               <h1 className="font-display text-2xl text-white tracking-wide leading-none">
                 {session?.shows?.name} · LISTS
               </h1>
+              {listTitle && <p className="text-brand-amber text-sm font-medium mt-0.5 truncate max-w-xs">{listTitle}</p>}
               <p className="text-brand-muted text-xs mt-0.5">
                 {revealedCount}/{totalAnswers} revealed ·{' '}
                 {suddenDeath ? '⚡ SUDDEN DEATH' : gameMode === 'strike' ? '3-Strike' : `Round ${Math.min(Math.floor(guessCount / Math.max(players.filter(p=>!p.eliminated).length,1)) + 1, settings.total_rounds ?? 99)} of ${settings.total_rounds ?? '?'} (${pickStyle})`}
