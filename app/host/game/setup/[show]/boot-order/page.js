@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/NavBar'
-import PersonalitySearch from '@/components/PersonalitySearch'
+import DraggablePlayerList from '@/components/DraggablePlayerList'
 import { supabase } from '@/lib/supabase'
 
 export default function BootOrderSetupPage() {
@@ -137,42 +137,14 @@ export default function BootOrderSetupPage() {
             <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
               <h2 className="font-display text-2xl text-white tracking-wide mb-1">PLAYERS</h2>
               <p className="text-brand-muted text-xs mb-4">How many players?</p>
-              <div className="flex gap-2 mb-4">
-                {[2,3,4,5,6,7,8].map(n => (
-                  <button key={n} onClick={() => setPlayerCount(n)}
-                    className={`w-9 h-9 rounded-lg font-display text-lg transition-all ${playerCount === n ? 'bg-brand-red text-white' : 'bg-brand-card border border-brand-border text-brand-muted hover:text-white'}`}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col gap-2 mb-3">
-                {selectedPlayers.filter(Boolean).map((pid, idx) => {
-                  const pers = personalities.find(p => p.id === pid)
-                  return (
-                    <div key={pid} className="flex items-center gap-3 bg-brand-card border border-brand-border rounded-xl px-3 py-2">
-                      <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-border flex-shrink-0">
-                        {pers?.photo_url
-                          ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs font-display">{pers?.name?.[0]}</div>
-                        }
-                      </div>
-                      <span className="flex-1 text-white text-sm">{pers?.name}</span>
-                      <button onClick={() => setPlayer(idx, '')}
-                        className="text-brand-muted hover:text-brand-red text-xs transition-colors">✕</button>
-                    </div>
-                  )
-                })}
-              </div>
-              {selectedPlayers.filter(Boolean).length < playerCount && (
-                <PersonalitySearch
-                  onSelect={p => {
-                    const emptyIdx = selectedPlayers.findIndex(id => !id)
-                    if (emptyIdx !== -1) setPlayer(emptyIdx, p.id)
-                  }}
-                  excluded={selectedPlayers.filter(Boolean)}
-                  placeholder={`Add player ${selectedPlayers.filter(Boolean).length + 1}…`}
-                />
-              )}
+
+              <DraggablePlayerList
+                playerCount={playerCount}
+                setPlayerCount={setPlayerCount}
+                selectedPlayers={selectedPlayers}
+                setSelectedPlayers={setSelectedPlayers}
+                personalities={personalities}
+              />
 
             </div>
 
@@ -236,15 +208,27 @@ export default function BootOrderSetupPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-brand-muted text-xs mb-1.5 uppercase tracking-widest">Min Placement</label>
-                  <input type="number" min={1} max={placementMax} value={placementMin}
-                    onChange={e => setPlacementMin(Math.min(parseInt(e.target.value) || 1, placementMax))}
+                  <input type="number" min={1} max={placementMax}
+                    value={placementMin || ''}
+                    onChange={e => {
+                      if (e.target.value === '') { setPlacementMin(0); return }
+                      const n = parseInt(e.target.value)
+                      if (!isNaN(n)) setPlacementMin(Math.min(n, placementMax))
+                    }}
+                    onBlur={() => { if (!placementMin || placementMin < 1) setPlacementMin(1) }}
                     className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-2.5 text-white text-center font-display text-2xl focus:outline-none focus:border-brand-amber" />
                   <p className="text-brand-muted text-xs mt-1 text-center">1 = winner</p>
                 </div>
                 <div>
                   <label className="block text-brand-muted text-xs mb-1.5 uppercase tracking-widest">Max Placement</label>
-                  <input type="number" min={placementMin} max={50} value={placementMax}
-                    onChange={e => setPlacementMax(Math.max(parseInt(e.target.value) || 1, placementMin))}
+                  <input type="number" min={placementMin} max={50}
+                    value={placementMax || ''}
+                    onChange={e => {
+                      if (e.target.value === '') { setPlacementMax(0); return }
+                      const n = parseInt(e.target.value)
+                      if (!isNaN(n)) setPlacementMax(Math.max(n, placementMin))
+                    }}
+                    onBlur={() => { if (!placementMax || placementMax < 1) setPlacementMax(18) }}
                     className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-2.5 text-white text-center font-display text-2xl focus:outline-none focus:border-brand-amber" />
                 </div>
               </div>
