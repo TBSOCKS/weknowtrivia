@@ -78,7 +78,7 @@ function HomeContent() {
         {view === 'home' && (
           <div className="flex flex-col gap-4 animate-fade-in">
             <button
-              onClick={() => { setView('host'); setError('') }}
+              onClick={() => router.push('/host')}
               className="group relative overflow-hidden bg-brand-panel border border-brand-border rounded-2xl p-6 text-left hover:border-brand-red transition-all duration-300 hover:shadow-[0_0_30px_rgba(230,57,70,0.15)]"
             >
               <div className="flex items-center gap-4">
