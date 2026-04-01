@@ -22,6 +22,8 @@ export default function LeaderboardPage() {
   const [loading, setLoading]       = useState(true)
   const [selectedShow, setSelectedShow] = useState('')
   const [selectedMode, setSelectedMode] = useState('lists')
+  const [managing, setManaging]           = useState(false)
+  const [deleting, setDeleting]           = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -57,14 +59,36 @@ export default function LeaderboardPage() {
 
   const modes = ['lists', 'boot_order']
 
+  async function handleDeleteEntry(id) {
+    if (!confirm('Remove this player from the leaderboard?')) return
+    setDeleting(id)
+    await supabase.from('leaderboard').delete().eq('id', id)
+    setEntries(prev => prev.filter(e => e.id !== id))
+    setDeleting(null)
+  }
+
+  async function handleClearAll() {
+    if (!confirm(`Clear ALL leaderboard records for this show + mode? This cannot be undone.`)) return
+    await supabase.from('leaderboard')
+      .delete()
+      .eq('show_id', selectedShow)
+      .eq('mode', selectedMode)
+    setEntries([])
+  }
+
   return (
     <div className="min-h-screen bg-brand-bg">
       <NavBar />
       <div className="max-w-4xl mx-auto px-4 py-10">
-        <div className="mb-8">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
           <h1 className="font-display text-6xl text-white tracking-wide">LEADERBOARD</h1>
           <p className="text-brand-muted mt-1">All-time standings</p>
-        </div>
+          </div>
+        <button onClick={() => setManaging(v => !v)}
+          className={`self-start px-4 py-2 rounded-xl border font-display text-lg tracking-wide transition-all ${managing ? 'border-brand-red bg-brand-red/10 text-brand-red' : 'border-brand-border text-brand-muted hover:text-white'}`}>
+          {managing ? 'DONE' : 'MANAGE'}
+        </button>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-8">
@@ -171,9 +195,15 @@ export default function LeaderboardPage() {
                     <span className="font-display text-3xl text-brand-muted">{entry.games_played}</span>
                   </div>
 
-                  {/* Points */}
-                  <div className="col-span-2 text-right">
+                  {/* Points / Delete */}
+                  <div className="col-span-2 text-right flex items-center justify-end gap-2">
                     <span className="font-display text-3xl text-white">{entry.total_points}</span>
+                    {managing && (
+                      <button onClick={() => handleDeleteEntry(entry.id)} disabled={deleting === entry.id}
+                        className="text-brand-red/50 hover:text-brand-red transition-colors text-lg disabled:opacity-50 ml-1">
+                        {deleting === entry.id ? '…' : '✕'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )
