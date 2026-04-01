@@ -281,8 +281,11 @@ export default function BootOrderGamePage() {
       }
 
       const guessedPlacement = ans.castaway.placement
+      const correctSeasonId  = targetSeason?.id ?? currentRound?.question_data?.season_id
+      const guessedSeasonId  = ans.castaway.seasons?.id
+      const wrongSeason      = correctSeasonId && guessedSeasonId && correctSeasonId !== guessedSeasonId
       const diff = Math.abs(guessedPlacement - targetPlacement)
-      const pts  = diff === 0 ? 3 : diff === 1 ? 1 : 0
+      const pts  = wrongSeason ? 0 : diff === 0 ? 3 : diff === 1 ? 1 : 0
       awardedAnswers[player.id] = { ...ans, score: pts }
 
       if (roundId) {
