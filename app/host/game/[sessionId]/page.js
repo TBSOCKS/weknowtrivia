@@ -143,6 +143,43 @@ export default function GameSessionPage() {
   }
 
   async function advanceTurnOnTimeout() {
+    // If in sudden death, handle separately
+    if (suddenDeath) {
+      const sdActive = players.filter(p => sdPlayers.includes(p.id))
+      const sdPicker = sdActive[sdGuessCount % Math.max(sdActive.length, 1)]
+      const newGuessCount = sdGuessCount + 1
+      const isLastInRound = newGuessCount % sdActive.length === 0
+
+      setFeedback({ type: 'wrong', message: `⏰ Time's up! ${sdPicker?.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
+      setSdGuessCount(newGuessCount)
+
+      if (isLastInRound) {
+        const survivors = sdActive.filter(p => sdCorrect.has(p.id))
+        if (survivors.length === 0) {
+          setSdCorrect(new Set())
+          setSdGuessCount(0)
+          setFeedback({ type: 'wrong', message: '⏰ Everyone timed out — sudden death continues!' })
+        } else if (survivors.length === 1) {
+          const winnerPlayer = survivors[0]
+          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+          await saveLeaderboard(players, winnerPlayer)
+          setSuddenDeath(false)
+          setWinner(winnerPlayer)
+          setGameOver(true)
+          return
+        } else {
+          setSdPlayers(survivors.map(p => p.id))
+          setSdCorrect(new Set())
+          setSdGuessCount(0)
+        }
+        if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
+      } else {
+        // More SD players to go — reset timer for next one
+        if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
+      }
+      return
+    }
+
     // Fetch fresh state from DB to avoid stale React state (especially after undo)
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('settings').eq('id', sessionId).single(),
@@ -551,6 +588,11 @@ export default function GameSessionPage() {
       setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${sdPicker.personalities?.name?.split(' ')[0]} survives!` })
       setSdGuessCount(newGuessCount)
 
+      // Reset timer for next SD player (unless this was the last guess in the round)
+      if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
+        resetTimer(settings.timer_seconds)
+      }
+
       if (isLastInRound) {
         // Round over — check survivors
         const survivors = sdActive.filter(p => newCorrect.has(p.id))
@@ -575,6 +617,11 @@ export default function GameSessionPage() {
       // Wrong — eliminated from SD (no point awarded)
       setFeedback({ type: 'wrong', message: `✗ Wrong! ${sdPicker.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
       setSdGuessCount(newGuessCount)
+
+      // Reset timer for next SD player
+      if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
+        resetTimer(settings.timer_seconds)
+      }
 
       if (isLastInRound) {
         // Round over — check survivors
