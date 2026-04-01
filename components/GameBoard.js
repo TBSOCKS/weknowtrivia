@@ -11,23 +11,31 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const GAP = 8
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
-      const minGap = 6
-      const byW = (width  - minGap * (cols - 1)) / cols
-      const byH = (height - minGap * (rows - 1)) / rows
+      const byW = (width  - GAP * (cols - 1)) / cols
+      const byH = (height - GAP * (rows - 1)) / rows
       setCellSize(Math.floor(Math.min(byW, byH)))
     })
     obs.observe(el)
     return () => obs.disconnect()
   }, [cols, rows])
 
+  const GAP = 8
+
   return (
-    <div ref={containerRef} className="w-full h-full flex flex-col justify-between py-1">
-      {cellSize > 0 && Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex justify-between">
-          {answers.slice(r * cols, r * cols + cols).map((ans, colIdx) => {
-            const idx = r * cols + colIdx
+    <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+      {cellSize > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+            gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
+            gap: `${GAP}px`,
+          }}
+        >
+          {answers.map((ans, idx) => {
             const revealed = revealedIds.has(ans.id)
             const photoUrl = ans.castaways?.seasons?.version_season
               ? `https://gradientdescending.com/survivor/castaways/colour/${ans.castaways.seasons.version_season}US${ans.castaways.castaway_id}.png`
@@ -79,7 +87,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
             )
           })}
         </div>
-      ))}
+      )}
     </div>
   )
 }

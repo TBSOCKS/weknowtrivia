@@ -400,7 +400,7 @@ export default function GameSessionPage() {
         </div>
 
         {/* Right sidebar: guess input + players */}
-        <div className="w-52 flex flex-col gap-3 flex-shrink-0 min-h-0">
+        <div className="w-80 flex flex-col gap-3 flex-shrink-0 min-h-0">
 
           {/* Guess input */}
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-3 flex-shrink-0">
