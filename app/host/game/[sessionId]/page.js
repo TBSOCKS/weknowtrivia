@@ -27,6 +27,7 @@ export default function GameSessionPage() {
   const [sdPlayers, setSdPlayers]       = useState([])
   const [sdGuessCount, setSdGuessCount] = useState(0)
   const [sdCorrect, setSdCorrect]       = useState(new Set()) // player ids correct this SD round
+  const [lastStrikeUndo, setLastStrikeUndo] = useState(null) // { playerId, prevStrikes, prevEliminated }
 
   // Timer
   const [timeLeft, setTimeLeft]         = useState(null)
@@ -135,15 +136,61 @@ export default function GameSessionPage() {
   }
 
   async function advanceTurnOnTimeout() {
-    // Increment guess count to skip to next picker, no strike
     const sess = await supabase.from('game_sessions').select('settings').eq('id', sessionId).single()
     if (!sess.data) return
     const s = sess.data.settings ?? {}
     const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
     await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+
+    // In strike mode, apply a strike to the current picker
+    if ((s.mode ?? 'strike') === 'strike' && currentPicker) {
+      const newStrikes = (currentPicker.strikes ?? 0) + 1
+      const eliminated = newStrikes >= 3
+      await supabase.from('session_players')
+        .update({ strikes: newStrikes, eliminated })
+        .eq('id', currentPicker.id)
+
+      // Save undo state
+      setLastStrikeUndo({
+        playerId:      currentPicker.id,
+        prevStrikes:   currentPicker.strikes ?? 0,
+        prevEliminated: currentPicker.eliminated ?? false,
+        guessCount:    s.guess_count ?? 0,
+      })
+      setFeedback({ type: 'strike', message: `⏰ Time's up! ${currentPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
+
+      // Check game over
+      const updatedPlayers = players.map(p =>
+        p.id === currentPicker.id ? { ...p, strikes: newStrikes, eliminated } : p
+      )
+      await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
+    }
+
     await reloadPlayers()
-    // Restart timer
     const secs = s.timer_seconds
+    if (secs) resetTimer(secs)
+  }
+
+  async function undoTimerStrike() {
+    if (!lastStrikeUndo) return
+    const { playerId, prevStrikes, prevEliminated, guessCount } = lastStrikeUndo
+    // Restore player state
+    await supabase.from('session_players')
+      .update({ strikes: prevStrikes, eliminated: prevEliminated })
+      .eq('id', playerId)
+    // Restore guess count
+    const sess = await supabase.from('game_sessions').select('settings').eq('id', sessionId).single()
+    if (sess.data) {
+      await supabase.from('game_sessions')
+        .update({ settings: { ...sess.data.settings, guess_count: guessCount }, status: 'active' })
+        .eq('id', sessionId)
+    }
+    setLastStrikeUndo(null)
+    setGameOver(false)
+    setWinner(null)
+    setFeedback({ type: 'correct', message: '↩ Strike undone — timer reset' })
+    await reloadPlayers()
+    const secs = sess.data?.settings?.timer_seconds
     if (secs) resetTimer(secs)
   }
 
@@ -724,6 +771,12 @@ export default function GameSessionPage() {
               }`}>
                 {feedback.message}
               </div>
+            )}
+            {lastStrikeUndo && (
+              <button onClick={undoTimerStrike}
+                className="mt-1.5 w-full text-xs text-brand-amber hover:text-amber-400 border border-brand-amber/30 hover:border-brand-amber/60 rounded-lg py-1 transition-colors">
+                ↩ Undo timer strike
+              </button>
             )}
           </div>
 
