@@ -327,35 +327,46 @@ export default function GameSessionPage() {
   // Save leaderboard if tracking is enabled
   async function saveLeaderboard(allPlayers, winnerPlayer) {
     // Fetch fresh session to ensure we have latest settings
-    const { data: freshSess } = await supabase
+    const { data: freshSess, error: sessErr } = await supabase
       .from('game_sessions').select('*').eq('id', sessionId).single()
-    if (!freshSess?.settings?.track_leaderboard) return
+    
+    console.log('[LB] freshSess settings:', freshSess?.settings)
+    console.log('[LB] track_leaderboard:', freshSess?.settings?.track_leaderboard)
+    
+    if (!freshSess?.settings?.track_leaderboard) {
+      console.log('[LB] Skipping — tracking not enabled')
+      return
+    }
     const showId = freshSess.show_id
     const mode   = freshSess.mode
+    console.log('[LB] Saving for showId:', showId, 'mode:', mode, 'players:', allPlayers.length)
+    
     for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
       const addPoints = p.score ?? 0
+      console.log('[LB] Processing player:', p.personality_id, 'winner:', isWinner, 'points:', addPoints)
 
       // Check if record exists
-      const { data: existing } = await supabase
+      const { data: existing, error: existErr } = await supabase
         .from('leaderboard')
         .select('*')
         .eq('personality_id', p.personality_id)
         .eq('show_id', showId)
         .eq('mode', mode)
-        .single()
+        .maybeSingle()  // use maybeSingle to avoid error when no record found
+
+      console.log('[LB] Existing record:', existing, 'error:', existErr)
 
       if (existing) {
-        // Increment existing record
-        await supabase.from('leaderboard').update({
+        const { error: updateErr } = await supabase.from('leaderboard').update({
           games_played: existing.games_played + 1,
           wins:         existing.wins + (isWinner ? 1 : 0),
           total_points: existing.total_points + addPoints,
           updated_at:   new Date().toISOString(),
         }).eq('id', existing.id)
+        console.log('[LB] Update error:', updateErr)
       } else {
-        // Insert new record
-        await supabase.from('leaderboard').insert({
+        const { error: insertErr } = await supabase.from('leaderboard').insert({
           personality_id: p.personality_id,
           show_id:        showId,
           mode,
@@ -363,8 +374,10 @@ export default function GameSessionPage() {
           wins:           isWinner ? 1 : 0,
           total_points:   addPoints,
         })
+        console.log('[LB] Insert error:', insertErr)
       }
     }
+    console.log('[LB] Done saving leaderboard')
   }
 
   // Handle a sudden death guess
