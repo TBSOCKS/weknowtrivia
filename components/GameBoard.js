@@ -23,7 +23,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   }, [cols, rows])
 
   return (
-    <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+    <div ref={containerRef} className="w-full h-full flex items-start justify-start pt-1">
       {cellSize > 0 && (
         <div
           style={{
