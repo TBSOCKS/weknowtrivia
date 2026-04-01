@@ -18,7 +18,7 @@ const MODES = [
     icon:  '🎡',
     label: 'BOOT ORDER',
     desc:  'Spin for a season and placement — guess who finished there.',
-    available: false,
+    available: true,
   },
   {
     slug:  'scattergories',

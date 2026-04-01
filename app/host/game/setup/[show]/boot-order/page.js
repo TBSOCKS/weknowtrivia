@@ -1,0 +1,291 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import NavBar from '@/components/NavBar'
+import { supabase } from '@/lib/supabase'
+
+export default function BootOrderSetupPage() {
+  const { show }  = useParams()
+  const router    = useRouter()
+
+  const [personalities, setPersonalities] = useState([])
+  const [seasons, setSeasons]             = useState([])
+  const [showData, setShowData]           = useState(null)
+  const [loading, setLoading]             = useState(true)
+  const [creating, setCreating]           = useState(false)
+  const [error, setError]                 = useState('')
+
+  // Players
+  const [playerCount, setPlayerCount]     = useState(2)
+  const [selectedPlayers, setSelectedPlayers] = useState([])
+
+  // Season pool
+  const [excludedSeasons, setExcludedSeasons] = useState(new Set())
+  const [showSeasonFilter, setShowSeasonFilter] = useState(false)
+
+  // Settings
+  const [placementMin, setPlacementMin]   = useState(1)
+  const [placementMax, setPlacementMax]   = useState(18)
+  const [timerSeconds, setTimerSeconds]   = useState(60)
+  const [timerEnabled, setTimerEnabled]   = useState(true)
+  const [totalRounds, setTotalRounds]     = useState(10)
+  const [gameType, setGameType]           = useState('host') // 'host' | 'code'
+
+  useEffect(() => {
+    async function load() {
+      const [pRes, sRes, shRes] = await Promise.all([
+        supabase.from('personalities').select('*').eq('active', true).order('name'),
+        supabase.from('seasons').select('*, shows(slug)').order('season_number'),
+        supabase.from('shows').select('*').eq('slug', show).single(),
+      ])
+      setPersonalities(pRes.data ?? [])
+      setSeasons((sRes.data ?? []).filter(s => s.shows?.slug === show))
+      setShowData(shRes.data)
+      setLoading(false)
+    }
+    load()
+  }, [show])
+
+  useEffect(() => {
+    setSelectedPlayers(prev => {
+      const next = [...prev]
+      while (next.length < playerCount) next.push('')
+      return next.slice(0, playerCount)
+    })
+  }, [playerCount])
+
+  function setPlayer(idx, id) {
+    setSelectedPlayers(prev => { const n = [...prev]; n[idx] = id; return n })
+  }
+
+  function availableFor(idx) {
+    const others = selectedPlayers.filter((_, i) => i !== idx)
+    return personalities.filter(p => !others.includes(p.id))
+  }
+
+  function toggleSeason(id) {
+    setExcludedSeasons(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function generateCode() {
+    return Math.random().toString(36).substring(2, 6).toUpperCase()
+  }
+
+  async function handleStart() {
+    const filled = selectedPlayers.filter(Boolean)
+    if (filled.length < playerCount) { setError('Please select all players'); return }
+    if (seasons.filter(s => !excludedSeasons.has(s.id)).length === 0) {
+      setError('At least one season must be included'); return
+    }
+    setCreating(true); setError('')
+
+    const includedSeasonIds = seasons.filter(s => !excludedSeasons.has(s.id)).map(s => s.id)
+    const code = gameType === 'code' ? generateCode() : null
+
+    const settings = {
+      timer_seconds:   timerEnabled ? timerSeconds : null,
+      total_rounds:    totalRounds,
+      current_round:   1,
+      placement_min:   placementMin,
+      placement_max:   placementMax,
+      season_pool:     includedSeasonIds,
+      game_type:       gameType,
+    }
+
+    const { data: session, error: sessErr } = await supabase
+      .from('game_sessions')
+      .insert({ mode: 'boot_order', show_id: showData?.id, status: 'active', current_round: 1, settings, code })
+      .select().single()
+
+    if (sessErr) { setError(sessErr.message); setCreating(false); return }
+
+    const playerRows = filled.map((pid, idx) => ({
+      session_id: session.id, personality_id: pid,
+      turn_order: idx + 1, score: 0, strikes: 0, eliminated: false,
+    }))
+    await supabase.from('session_players').insert(playerRows)
+
+    router.push(`/host/game/boot-order/${session.id}`)
+  }
+
+  if (loading) return <div className="min-h-screen bg-brand-bg flex items-center justify-center text-brand-muted">Loading…</div>
+
+  return (
+    <div className="min-h-screen bg-brand-bg">
+      <NavBar />
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        <div className="mb-8">
+          <Link href={`/host/game/setup/${show}`} className="text-brand-muted hover:text-white text-sm mb-2 inline-flex items-center gap-1 transition-colors">
+            ← {showData?.name ?? 'Show'}
+          </Link>
+          <h1 className="font-display text-6xl text-white tracking-wide">BOOT ORDER SETUP</h1>
+          <p className="text-brand-muted mt-1">{showData?.name}</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left */}
+          <div className="flex flex-col gap-6">
+
+            {/* Players */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
+              <h2 className="font-display text-2xl text-white tracking-wide mb-1">PLAYERS</h2>
+              <p className="text-brand-muted text-xs mb-4">How many players?</p>
+              <div className="flex gap-2 mb-4">
+                {[2,3,4,5,6,7,8].map(n => (
+                  <button key={n} onClick={() => setPlayerCount(n)}
+                    className={`w-9 h-9 rounded-lg font-display text-lg transition-all ${playerCount === n ? 'bg-brand-red text-white' : 'bg-brand-card border border-brand-border text-brand-muted hover:text-white'}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: playerCount }, (_, idx) => {
+                  const pid  = selectedPlayers[idx] ?? ''
+                  const pers = personalities.find(p => p.id === pid)
+                  return (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-card border border-brand-border flex-shrink-0">
+                        {pers?.photo_url
+                          ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs font-display">{idx + 1}</div>
+                        }
+                      </div>
+                      <select value={pid} onChange={e => setPlayer(idx, e.target.value)}
+                        className="flex-1 bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-red transition-colors text-sm">
+                        <option value="">— Player {idx + 1} —</option>
+                        {availableFor(idx).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Season pool */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="font-display text-2xl text-white tracking-wide">SEASON POOL</h2>
+                  <p className="text-brand-muted text-xs">{seasons.length - excludedSeasons.size} of {seasons.length} seasons included</p>
+                </div>
+                <button onClick={() => setShowSeasonFilter(v => !v)}
+                  className="text-sm text-brand-amber hover:underline">{showSeasonFilter ? 'Done' : 'Filter'}</button>
+              </div>
+              {showSeasonFilter && (
+                <div className="mt-2 max-h-48 overflow-y-auto flex flex-col gap-1 animate-slide-up">
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={() => setExcludedSeasons(new Set())} className="text-xs text-brand-green hover:underline">Select all</button>
+                    <span className="text-brand-border">·</span>
+                    <button onClick={() => setExcludedSeasons(new Set(seasons.map(s => s.id)))} className="text-xs text-brand-red hover:underline">Deselect all</button>
+                  </div>
+                  {seasons.map(s => {
+                    const included = !excludedSeasons.has(s.id)
+                    return (
+                      <label key={s.id} className="flex items-center gap-2 cursor-pointer text-sm py-0.5">
+                        <input type="checkbox" checked={included} onChange={() => toggleSeason(s.id)} className="accent-brand-amber w-3.5 h-3.5" />
+                        <span className={included ? 'text-white' : 'text-brand-muted line-through'}>S{s.season_number}: {s.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right */}
+          <div className="flex flex-col gap-6">
+
+            {/* Game type */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
+              <h2 className="font-display text-2xl text-white tracking-wide mb-4">GAME TYPE</h2>
+              <div className="flex flex-col gap-3">
+                {[
+                  { value: 'host', icon: '🎬', label: 'HOST-ONLY', desc: 'Host enters answers for all players after each round.' },
+                  { value: 'code', icon: '📱', label: '4-DIGIT CODE', desc: 'Players submit answers from their own devices.' },
+                ].map(opt => (
+                  <button key={opt.value} onClick={() => setGameType(opt.value)}
+                    className={`text-left p-4 rounded-xl border transition-all flex items-center gap-4 ${gameType === opt.value ? 'border-brand-amber bg-brand-amber/10' : 'border-brand-border bg-brand-card'}`}>
+                    <span className="text-2xl">{opt.icon}</span>
+                    <div>
+                      <div className="font-display text-xl text-white tracking-wide">{opt.label}</div>
+                      <div className="text-brand-muted text-xs">{opt.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Placement range */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
+              <h2 className="font-display text-2xl text-white tracking-wide mb-4">PLACEMENT RANGE</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-brand-muted text-xs mb-1.5 uppercase tracking-widest">Min Placement</label>
+                  <input type="number" min={1} max={placementMax} value={placementMin}
+                    onChange={e => setPlacementMin(Math.min(parseInt(e.target.value) || 1, placementMax))}
+                    className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-2.5 text-white text-center font-display text-2xl focus:outline-none focus:border-brand-amber" />
+                  <p className="text-brand-muted text-xs mt-1 text-center">1 = winner</p>
+                </div>
+                <div>
+                  <label className="block text-brand-muted text-xs mb-1.5 uppercase tracking-widest">Max Placement</label>
+                  <input type="number" min={placementMin} max={50} value={placementMax}
+                    onChange={e => setPlacementMax(Math.max(parseInt(e.target.value) || 1, placementMin))}
+                    className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-2.5 text-white text-center font-display text-2xl focus:outline-none focus:border-brand-amber" />
+                </div>
+              </div>
+            </div>
+
+            {/* Rounds + Timer */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
+              <h2 className="font-display text-2xl text-white tracking-wide mb-4">ROUNDS & TIMER</h2>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-brand-muted text-xs uppercase tracking-widest">Total Rounds:</label>
+                    <input type="number" min={1} max={50} value={totalRounds}
+                      onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 1) setTotalRounds(v) }}
+                      className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-amber" />
+                  </div>
+                  <input type="range" min={1} max={50} value={totalRounds}
+                    onChange={e => setTotalRounds(parseInt(e.target.value))} className="w-full accent-brand-amber" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-brand-muted text-xs uppercase tracking-widest">Timer</label>
+                    <button onClick={() => setTimerEnabled(v => !v)}
+                      className={`w-10 h-5 rounded-full transition-colors relative ${timerEnabled ? 'bg-brand-red' : 'bg-brand-border'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${timerEnabled ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                  {timerEnabled && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className="text-brand-muted text-xs uppercase tracking-widest">Seconds:</label>
+                        <input type="number" min={5} max={120} value={timerSeconds}
+                          onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v)) setTimerSeconds(v) }}
+                          className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-red" />
+                      </div>
+                      <input type="range" min={5} max={120} step={5} value={timerSeconds}
+                        onChange={e => setTimerSeconds(parseInt(e.target.value))} className="w-full accent-brand-red" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="text-brand-red text-sm mt-4 text-center">{error}</p>}
+        <button onClick={handleStart} disabled={creating}
+          className="w-full mt-6 bg-brand-red hover:bg-red-600 disabled:opacity-50 text-white font-display text-4xl tracking-widest py-5 rounded-2xl transition-colors shadow-[0_0_40px_rgba(230,57,70,0.2)]">
+          {creating ? 'LAUNCHING…' : 'START GAME'}
+        </button>
+      </div>
+    </div>
+  )
+}
