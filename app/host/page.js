@@ -1,85 +1,184 @@
 'use client'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import NavBar from '@/components/NavBar'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
-export default function HostDashboard() {
-  const [stats, setStats] = useState({ personalities: 0, lists: 0, seasons: 0 })
+function HomeContent() {
+  const [view, setView]         = useState('home')   // 'home' | 'host' | 'join'
+  const [password, setPassword] = useState('')
+  const [code, setCode]         = useState('')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const router       = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    async function load() {
-      const [p, l, s] = await Promise.all([
-        supabase.from('personalities').select('id', { count: 'exact', head: true }),
-        supabase.from('lists').select('id', { count: 'exact', head: true }),
-        supabase.from('seasons').select('id', { count: 'exact', head: true }),
-      ])
-      setStats({
-        personalities: p.count ?? 0,
-        lists:         l.count ?? 0,
-        seasons:       s.count ?? 0,
+    if (searchParams.get('redirect') === 'host') setView('host')
+  }, [searchParams])
+
+  async function handleHostLogin(e) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
       })
+      if (res.ok) {
+        router.push('/host')
+      } else {
+        setError('Incorrect password. Try again.')
+      }
+    } catch {
+      setError('Connection error. Please try again.')
     }
-    load()
-  }, [])
+    setLoading(false)
+  }
 
-  const tiles = [
-    {
-      href:  '/host/game/setup',
-      icon:  '🎮',
-      label: 'START A GAME',
-      desc:  'Set up and launch a new Lists game',
-      color: 'hover:border-brand-red hover:shadow-[0_0_30px_rgba(230,57,70,0.15)]',
-      badge: null,
-    },
-    {
-      href:  '/host/admin',
-      icon:  '⚙️',
-      label: 'ADMIN',
-      desc:  'Manage personalities, seasons & lists',
-      color: 'hover:border-brand-amber hover:shadow-[0_0_30px_rgba(244,162,97,0.15)]',
-      badge: null,
-    },
-  ]
-
-  const statCards = [
-    { label: 'Personalities', value: stats.personalities, icon: '👤' },
-    { label: 'Trivia Lists',  value: stats.lists,         icon: '📋' },
-    { label: 'Seasons',       value: stats.seasons,       icon: '📺' },
-  ]
+  function handleJoin(e) {
+    e.preventDefault()
+    const trimmed = code.trim().toUpperCase()
+    if (trimmed.length !== 4) {
+      setError('Please enter a 4-digit code.')
+      return
+    }
+    router.push(`/join/${trimmed}`)
+  }
 
   return (
-    <div className="min-h-screen bg-brand-bg">
-      <NavBar />
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="mb-10">
-          <h1 className="font-display text-6xl text-white tracking-wide">HOST DASHBOARD</h1>
-          <p className="text-brand-muted mt-1">Welcome back. Ready to play?</p>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Background texture */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1a0a0c_0%,_#0c0c0f_60%)] pointer-events-none" />
+      <div className="absolute inset-0 opacity-5 pointer-events-none"
+           style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', backgroundSize: '60px 60px' }} />
+
+      <div className="relative z-10 w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 mb-3">
+            <span className="text-2xl">🔥</span>
+            <h1 className="font-display text-7xl logo-gradient tracking-wider leading-none">
+              WE KNOW
+            </h1>
+            <span className="text-2xl">🔥</span>
+          </div>
+          <div>
+            <h1 className="font-display text-7xl logo-gradient tracking-wider leading-none">
+              TRIVIA
+            </h1>
+          </div>
+          <p className="text-brand-muted text-sm mt-3 tracking-widest uppercase font-body">
+            A Rob Has a Podcast Experience
+          </p>
         </div>
 
-        {/* Stat row */}
-        <div className="grid grid-cols-3 gap-4 mb-10">
-          {statCards.map(s => (
-            <div key={s.label} className="bg-brand-panel border border-brand-border rounded-xl p-4 text-center">
-              <div className="text-2xl mb-1">{s.icon}</div>
-              <div className="font-display text-4xl text-white">{s.value}</div>
-              <div className="text-brand-muted text-xs mt-0.5">{s.label}</div>
-            </div>
-          ))}
-        </div>
+        {/* Cards */}
+        {view === 'home' && (
+          <div className="flex flex-col gap-4 animate-fade-in">
+            <button
+              onClick={() => router.push('/host')}
+              className="group relative overflow-hidden bg-brand-panel border border-brand-border rounded-2xl p-6 text-left hover:border-brand-red transition-all duration-300 hover:shadow-[0_0_30px_rgba(230,57,70,0.15)]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-brand-red/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  🎬
+                </div>
+                <div>
+                  <div className="font-display text-3xl text-white tracking-wide">I'M A HOST</div>
+                  <div className="text-brand-muted text-sm">Set up and run a game</div>
+                </div>
+              </div>
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-muted group-hover:text-brand-red transition-colors text-xl">→</div>
+            </button>
 
-        {/* Action tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {tiles.map(t => (
-            <Link key={t.href} href={t.href}
-              className={`group bg-brand-panel border border-brand-border rounded-2xl p-7 transition-all duration-300 ${t.color}`}>
-              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform inline-block">{t.icon}</div>
-              <div className="font-display text-4xl text-white tracking-wide mb-1">{t.label}</div>
-              <div className="text-brand-muted text-sm">{t.desc}</div>
-            </Link>
-          ))}
-        </div>
+            <button
+              onClick={() => { setView('join'); setError('') }}
+              className="group relative overflow-hidden bg-brand-panel border border-brand-border rounded-2xl p-6 text-left hover:border-brand-amber transition-all duration-300 hover:shadow-[0_0_30px_rgba(244,162,97,0.15)]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-brand-amber/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  📱
+                </div>
+                <div>
+                  <div className="font-display text-3xl text-white tracking-wide">JOIN A GAME</div>
+                  <div className="text-brand-muted text-sm">Enter your 4-digit code</div>
+                </div>
+              </div>
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-muted group-hover:text-brand-amber transition-colors text-xl">→</div>
+            </button>
+          </div>
+        )}
+
+        {/* Host Login */}
+        {view === 'host' && (
+          <div className="bg-brand-panel border border-brand-border rounded-2xl p-8 animate-slide-up">
+            <button onClick={() => { setView('home'); setError('') }}
+                    className="text-brand-muted hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
+              ← Back
+            </button>
+            <h2 className="font-display text-4xl text-white tracking-wide mb-1">HOST LOGIN</h2>
+            <p className="text-brand-muted text-sm mb-6">Enter the host password to continue</p>
+            <form onSubmit={handleHostLogin} className="flex flex-col gap-4">
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Password"
+                autoFocus
+                className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3 text-white placeholder-brand-muted focus:outline-none focus:border-brand-red transition-colors"
+              />
+              {error && <p className="text-brand-red text-sm">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-brand-red hover:bg-red-600 disabled:opacity-50 text-white font-display text-2xl tracking-widest py-3 rounded-xl transition-colors"
+              >
+                {loading ? 'LOGGING IN…' : 'ENTER'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Join Game */}
+        {view === 'join' && (
+          <div className="bg-brand-panel border border-brand-border rounded-2xl p-8 animate-slide-up">
+            <button onClick={() => { setView('home'); setError('') }}
+                    className="text-brand-muted hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
+              ← Back
+            </button>
+            <h2 className="font-display text-4xl text-white tracking-wide mb-1">JOIN GAME</h2>
+            <p className="text-brand-muted text-sm mb-6">Enter the 4-digit code from your host</p>
+            <form onSubmit={handleJoin} className="flex flex-col gap-4">
+              <input
+                type="text"
+                value={code}
+                onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))}
+                placeholder="XXXX"
+                maxLength={4}
+                autoFocus
+                className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-4 text-white placeholder-brand-muted text-center text-4xl font-display tracking-[0.5em] focus:outline-none focus:border-brand-amber transition-colors"
+              />
+              {error && <p className="text-brand-red text-sm text-center">{error}</p>}
+              <button
+                type="submit"
+                className="w-full bg-brand-amber hover:bg-amber-500 text-brand-bg font-display text-2xl tracking-widest py-3 rounded-xl transition-colors"
+              >
+                JOIN
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-brand-muted">Loading…</div>}>
+      <HomeContent />
+    </Suspense>
   )
 }
