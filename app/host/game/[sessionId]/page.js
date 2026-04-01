@@ -311,6 +311,7 @@ export default function GameSessionPage() {
         if (newGuessCount >= totalGuesses) {
           await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
           const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          await saveLeaderboard(players, sorted[0])
           setWinner(sorted[0])
           setGameOver(true)
         }
@@ -468,6 +469,7 @@ export default function GameSessionPage() {
     if (isOver) {
       await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
       const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      await saveLeaderboard(updatedPlayers, sorted[0])
       setWinner(sorted[0])
       setGameOver(true)
     }
@@ -478,6 +480,7 @@ export default function GameSessionPage() {
     if (!confirm('End this game early?')) return
     await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
     const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    await saveLeaderboard(players, sorted[0])
     setWinner(sorted[0])
     setGameOver(true)
   }
