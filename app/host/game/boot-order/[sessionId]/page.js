@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import CastawaySearch from '@/components/CastawaySearch'
 import { supabase } from '@/lib/supabase'
-import { formatTime } from '@/lib/gameUtils'
+import { formatTime, sortPlayers } from '@/lib/gameUtils'
 
 // Phases: idle → spinning → answering → revealed → finished
 export default function BootOrderGamePage() {
@@ -40,6 +40,8 @@ export default function BootOrderGamePage() {
 
   // Code game: track which players submitted
   const [submitted, setSubmitted]   = useState(new Set())
+  const [tiebreaker, setTiebreaker]  = useState(false) // in a tiebreaker round
+  const [tbPlayers, setTbPlayers]    = useState([]) // player ids in tiebreaker
 
   const load = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
@@ -300,14 +302,75 @@ export default function BootOrderGamePage() {
     clearInterval(timerRef.current)
   }
 
+  async function saveLeaderboard(allPlayers, winnerPlayer) {
+    if (!session?.settings?.track_leaderboard) return
+    for (const p of allPlayers) {
+      await supabase.from('leaderboard').upsert({
+        personality_id: p.personality_id,
+        show_id:        session.show_id,
+        mode:           'boot_order',
+        games_played:   1,
+        wins:           p.id === winnerPlayer?.id ? 1 : 0,
+        total_points:   p.score ?? 0,
+      }, { onConflict: 'personality_id,show_id,mode' }).catch(() => {})
+    }
+  }
+
   async function handleNextRound() {
     const settings  = session.settings ?? {}
     const nextRound = (settings.current_round ?? 1) + 1
 
-    if (nextRound > (settings.total_rounds ?? 10)) {
-      // Game over
+    if (nextRound > (settings.total_rounds ?? 10) && !tiebreaker) {
+      // Check for tie
+      const sorted   = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      const topScore = sorted[0].score ?? 0
+      const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
+      if (tied.length > 1) {
+        // Start tiebreaker round
+        setTiebreaker(true)
+        setTbPlayers(tied.map(p => p.id))
+        setPhase('idle')
+        clearInterval(timerRef.current)
+        setTimeLeft(null)
+        setCurrentRound(null)
+        setTargetCastaway(null)
+        setTargetSeason(null)
+        setTargetPlacement(null)
+        setAnswers({})
+        setSubmitted(new Set())
+        return
+      }
+      // No tie — game over
       await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+      await saveLeaderboard(players, sorted[0])
       setPhase('finished')
+      return
+    }
+
+    // After a tiebreaker round — check if still tied
+    if (tiebreaker) {
+      const tbPlayerObjs = players.filter(p => tbPlayers.includes(p.id))
+      const sorted       = [...tbPlayerObjs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      const topScore     = sorted[0].score ?? 0
+      const stillTied    = sorted.filter(p => (p.score ?? 0) === topScore)
+      if (stillTied.length === 1) {
+        // We have a winner
+        await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+        await saveLeaderboard(players, stillTied[0])
+        setPhase('finished')
+        return
+      }
+      // Still tied — another tiebreaker
+      setTbPlayers(stillTied.map(p => p.id))
+      setPhase('idle')
+      clearInterval(timerRef.current)
+      setTimeLeft(null)
+      setCurrentRound(null)
+      setTargetCastaway(null)
+      setTargetSeason(null)
+      setTargetPlacement(null)
+      setAnswers({})
+      setSubmitted(new Set())
       return
     }
 
@@ -496,7 +559,12 @@ export default function BootOrderGamePage() {
 
           {/* Spin button */}
           {phase === 'idle' && (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              {tiebreaker && (
+                <div className="font-display text-2xl text-brand-amber tracking-wide animate-pulse">
+                  ⚡ TIEBREAKER — {tbPlayers.length} players
+                </div>
+              )}
               <button onClick={handleSpin}
                 className="bg-brand-red hover:bg-red-600 text-white font-display text-6xl tracking-widest px-16 py-8 rounded-2xl transition-colors shadow-[0_0_60px_rgba(230,57,70,0.3)] hover:shadow-[0_0_80px_rgba(230,57,70,0.5)] animate-pulse-ring">
                 SPIN
@@ -515,7 +583,7 @@ export default function BootOrderGamePage() {
         <div className="w-96 flex flex-col gap-3 flex-shrink-0 min-h-0 overflow-y-auto">
           <div className="text-brand-muted text-xs uppercase tracking-widest">Players</div>
 
-          {players.map(player => {
+          {sortPlayers(tiebreaker ? players.filter(p => tbPlayers.includes(p.id)) : players, personalities).map(player => {
             const pers = personalities[player.id]
             const ans  = answers[player.id]
             const hasSubmitted = submitted.has(player.id) || (ans?.castaway !== undefined && ans?.castaway !== null)

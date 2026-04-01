@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/NavBar'
+import PersonalitySearch from '@/components/PersonalitySearch'
 import { supabase } from '@/lib/supabase'
 
 export default function BootOrderSetupPage() {
@@ -14,6 +15,7 @@ export default function BootOrderSetupPage() {
   const [showData, setShowData]           = useState(null)
   const [loading, setLoading]             = useState(true)
   const [creating, setCreating]           = useState(false)
+  const [trackLeaderboard, setTrackLeaderboard] = useState(false)
   const [error, setError]                 = useState('')
 
   // Players
@@ -143,18 +145,34 @@ export default function BootOrderSetupPage() {
                   </button>
                 ))}
               </div>
-              <div className="flex flex-col gap-2">
-                {Array.from({ length: playerCount }, (_, idx) => {
-                  const pid  = selectedPlayers[idx] ?? ''
+              <div className="flex flex-col gap-2 mb-3">
+                {selectedPlayers.filter(Boolean).map((pid, idx) => {
                   const pers = personalities.find(p => p.id === pid)
                   return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-card border border-brand-border flex-shrink-0">
+                    <div key={pid} className="flex items-center gap-3 bg-brand-card border border-brand-border rounded-xl px-3 py-2">
+                      <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-border flex-shrink-0">
                         {pers?.photo_url
                           ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs font-display">{idx + 1}</div>
+                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs font-display">{pers?.name?.[0]}</div>
                         }
                       </div>
+                      <span className="flex-1 text-white text-sm">{pers?.name}</span>
+                      <button onClick={() => setPlayer(idx, '')}
+                        className="text-brand-muted hover:text-brand-red text-xs transition-colors">✕</button>
+                    </div>
+                  )
+                })}
+              </div>
+              {selectedPlayers.filter(Boolean).length < playerCount && (
+                <PersonalitySearch
+                  onSelect={p => {
+                    const emptyIdx = selectedPlayers.findIndex(id => !id)
+                    if (emptyIdx !== -1) setPlayer(emptyIdx, p.id)
+                  }}
+                  excluded={selectedPlayers.filter(Boolean)}
+                  placeholder={`Add player ${selectedPlayers.filter(Boolean).length + 1}…`}
+                />
+              )}
                       <select value={pid} onChange={e => setPlayer(idx, e.target.value)}
                         className="flex-1 bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-red transition-colors text-sm">
                         <option value="">— Player {idx + 1} —</option>
@@ -277,6 +295,20 @@ export default function BootOrderSetupPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Leaderboard tracking */}
+        <div className="bg-brand-panel border border-brand-border rounded-2xl p-5 mt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-2xl text-white tracking-wide">TRACK LEADERBOARD</h2>
+              <p className="text-brand-muted text-xs mt-0.5">Record this game's results</p>
+            </div>
+            <button onClick={() => setTrackLeaderboard(v => !v)}
+              className={`w-12 h-6 rounded-full transition-colors relative ${trackLeaderboard ? 'bg-brand-green' : 'bg-brand-border'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${trackLeaderboard ? 'left-6' : 'left-0.5'}`} />
+            </button>
           </div>
         </div>
 
