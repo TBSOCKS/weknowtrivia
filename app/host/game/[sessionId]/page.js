@@ -28,6 +28,7 @@ export default function GameSessionPage() {
   const [sdGuessCount, setSdGuessCount] = useState(0)
   const [sdCorrect, setSdCorrect]       = useState(new Set()) // player ids correct this SD round
   const [lastStrikeUndo, setLastStrikeUndo] = useState(null) // { playerId, prevStrikes, prevEliminated }
+  const [lastTurnUndo, setLastTurnUndo]     = useState(null)  // { prevGuessCount } for round mode
 
   // Timer
   const [timeLeft, setTimeLeft]         = useState(null)
@@ -173,8 +174,30 @@ export default function GameSessionPage() {
       }
     }
 
+    // For round mode, save undo state and show feedback
+    if ((s.mode ?? 'strike') !== 'strike') {
+      setLastTurnUndo({ prevGuessCount: s.guess_count ?? 0 })
+      setFeedback({ type: 'wrong', message: `⏰ Time's up! Turn advanced.` })
+    }
+
     await reloadPlayers()
     const secs = s.timer_seconds
+    if (secs) resetTimer(secs)
+  }
+
+  async function undoTurnAdvance() {
+    if (!lastTurnUndo) return
+    clearInterval(timerRef.current)
+    const sess = await supabase.from('game_sessions').select('settings').eq('id', sessionId).single()
+    if (sess.data) {
+      await supabase.from('game_sessions')
+        .update({ settings: { ...sess.data.settings, guess_count: lastTurnUndo.prevGuessCount } })
+        .eq('id', sessionId)
+    }
+    setLastTurnUndo(null)
+    setFeedback({ type: 'correct', message: '↩ Turn undone — timer reset' })
+    await reloadPlayers()
+    const secs = sess.data?.settings?.timer_seconds
     if (secs) resetTimer(secs)
   }
 
@@ -223,6 +246,8 @@ export default function GameSessionPage() {
     if (submitting || !session) return
     setSubmitting(true)
     setFeedback(null)
+    setLastStrikeUndo(null)
+    setLastTurnUndo(null)
 
     // Check if this castaway is in the answer list and not yet revealed
     const matchedAnswer = answers.find(
@@ -783,6 +808,12 @@ export default function GameSessionPage() {
               <button onClick={undoTimerStrike}
                 className="mt-1.5 w-full text-xs text-brand-amber hover:text-amber-400 border border-brand-amber/30 hover:border-brand-amber/60 rounded-lg py-1 transition-colors">
                 ↩ Undo timer strike
+              </button>
+            )}
+            {lastTurnUndo && (
+              <button onClick={undoTurnAdvance}
+                className="mt-1.5 w-full text-xs text-brand-amber hover:text-amber-400 border border-brand-amber/30 hover:border-brand-amber/60 rounded-lg py-1 transition-colors">
+                ↩ Undo turn advance
               </button>
             )}
           </div>
