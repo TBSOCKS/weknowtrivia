@@ -79,7 +79,7 @@ export default function ListsSetupPage() {
       list_id:              selectedList,
       timer_seconds:        timerEnabled ? timerSeconds : null,
       mode:                 gameMode,
-      pick_style:           gameMode === 'round' ? pickStyle : null,
+      pick_style:           pickStyle,
       total_rounds:         gameMode === 'round' ? totalRounds : null,
       current_picker_index: 0,
       guess_count:          0,
@@ -217,32 +217,42 @@ export default function ListsSetupPage() {
                 ))}
               </div>
 
-              {gameMode === 'round' && (
-                <div className="mt-4 pt-4 border-t border-brand-border flex flex-col gap-4 animate-slide-up">
-                  <div>
-                    <label className="block text-brand-muted text-xs mb-2 uppercase tracking-widest">Pick Style</label>
-                    <div className="flex gap-2">
-                      {[{ value: 'classic', label: 'Classic (ABCABC)' }, { value: 'snake', label: 'Snake (ABCCBA)' }].map(opt => (
-                        <button key={opt.value} onClick={() => setPickStyle(opt.value)}
-                          className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
-                            pickStyle === opt.value
-                              ? 'border-brand-green bg-brand-green/10 text-white'
-                              : 'border-brand-border text-brand-muted hover:text-white'
-                          }`}>
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-brand-muted text-xs mb-2 uppercase tracking-widest">Total Rounds: {totalRounds}</label>
-                    <input type="range" min={3} max={50} value={totalRounds}
-                      onChange={e => setTotalRounds(parseInt(e.target.value))}
-                      className="w-full accent-brand-green" />
-                    <div className="flex justify-between text-brand-muted text-xs mt-1"><span>3</span><span>50</span></div>
+              <div className="mt-4 pt-4 border-t border-brand-border flex flex-col gap-4">
+                <div>
+                  <label className="block text-brand-muted text-xs mb-2 uppercase tracking-widest">Pick Style</label>
+                  <div className="flex gap-2">
+                    {[{ value: 'classic', label: 'Classic (ABCABC)' }, { value: 'snake', label: 'Snake (ABCCBA)' }].map(opt => (
+                      <button key={opt.value} onClick={() => setPickStyle(opt.value)}
+                        className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
+                          pickStyle === opt.value
+                            ? 'border-brand-green bg-brand-green/10 text-white'
+                            : 'border-brand-border text-brand-muted hover:text-white'
+                        }`}>
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
+                {gameMode === 'round' && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="text-brand-muted text-xs uppercase tracking-widest">Total Rounds:</label>
+                      <input
+                        type="number" min={1} max={100} value={totalRounds}
+                        onChange={e => {
+                          const v = parseInt(e.target.value)
+                          if (!isNaN(v) && v >= 1 && v <= 100) setTotalRounds(v)
+                        }}
+                        className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-green"
+                      />
+                    </div>
+                    <input type="range" min={1} max={100} value={totalRounds}
+                      onChange={e => setTotalRounds(parseInt(e.target.value))}
+                      className="w-full accent-brand-green" />
+                    <div className="flex justify-between text-brand-muted text-xs mt-1"><span>1</span><span>100</span></div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Timer */}

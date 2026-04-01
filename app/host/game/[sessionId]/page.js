@@ -199,21 +199,36 @@ export default function GameSessionPage() {
       const newGuessCount = guessCount + 1
       const newSettings = { ...settings, guess_count: newGuessCount }
 
+      // Snapshot updated scores for winner calculation (before stale reloadPlayers)
+      const updatedPlayersAfterCorrect = players.map(p =>
+        p.id === currentPicker?.id ? { ...p, score: (p.score ?? 0) + 1 } : p
+      )
+
       // Check if all answered
       if (newRevealed.size >= totalAnswers) {
         await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
-        setGameOver(true)
-        const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         setWinner(sorted[0])
+        setGameOver(true)
       } else {
         await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-        // After a correct guess, also check mathematical game-over in strike mode
+
+        // Check mathematical game-over in strike mode
         if (gameMode === 'strike') {
-          const updatedPlayers = players.map(p =>
-            p.id === currentPicker?.id ? { ...p, score: (p.score ?? 0) + 1 } : p
-          )
           const remaining = totalAnswers - newRevealed.size
-          await checkStrikeGameOver(updatedPlayers, remaining)
+          await checkStrikeGameOver(updatedPlayersAfterCorrect, remaining)
+        }
+
+        // Check round mode end condition
+        if (gameMode === 'round' && settings.total_rounds) {
+          const totalPlayers = players.filter(p => !p.eliminated).length
+          const totalGuesses = settings.total_rounds * totalPlayers
+          if (newGuessCount >= totalGuesses) {
+            await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+            const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+            setWinner(sorted[0])
+            setGameOver(true)
+          }
         }
       }
 
@@ -270,6 +285,18 @@ export default function GameSessionPage() {
         )
         const remaining = totalAnswers - revealedIds.size
         await checkStrikeGameOver(updatedPlayers, remaining)
+      }
+
+      // Check round mode end on wrong guess too
+      if (gameMode === 'round' && settings.total_rounds) {
+        const totalPlayers = players.filter(p => !p.eliminated).length
+        const totalGuesses = settings.total_rounds * totalPlayers
+        if (newGuessCount >= totalGuesses) {
+          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+          const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          setWinner(sorted[0])
+          setGameOver(true)
+        }
       }
 
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
@@ -340,7 +367,7 @@ export default function GameSessionPage() {
                 }
               </div>
               <div className="font-display text-4xl text-brand-amber tracking-wide">{winnerPersonality.name}</div>
-              <div className="text-brand-muted text-sm mt-1">WINNER · {winner.score} pts</div>
+              <div className="text-brand-muted text-sm mt-1">WINNER · {sorted.find(p => p.id === winner.id)?.score ?? winner.score} pts</div>
             </div>
           )}
           {/* Leaderboard */}
