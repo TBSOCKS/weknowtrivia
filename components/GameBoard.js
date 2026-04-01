@@ -11,7 +11,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const GAP = 8
+    const GAP = 5
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
       const byW = (width  - GAP * (cols - 1)) / cols
@@ -22,8 +22,6 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
     return () => obs.disconnect()
   }, [cols, rows])
 
-  const GAP = 8
-
   return (
     <div ref={containerRef} className="w-full h-full flex items-center justify-center">
       {cellSize > 0 && (
@@ -32,7 +30,7 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
             display: 'grid',
             gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
             gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
-            gap: `${GAP}px`,
+            gap: '5px',
           }}
         >
           {answers.map((ans, idx) => {
