@@ -136,34 +136,41 @@ export default function GameSessionPage() {
   }
 
   async function advanceTurnOnTimeout() {
-    const sess = await supabase.from('game_sessions').select('settings').eq('id', sessionId).single()
-    if (!sess.data) return
-    const s = sess.data.settings ?? {}
+    // Fetch fresh state from DB to avoid stale React state (especially after undo)
+    const [sessRes, playersRes] = await Promise.all([
+      supabase.from('game_sessions').select('settings').eq('id', sessionId).single(),
+      supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
+    ])
+    if (!sessRes.data) return
+    const s = sessRes.data.settings ?? {}
+    const freshPlayers = playersRes.data ?? []
+
     const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
     await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
 
-    // In strike mode, apply a strike to the current picker
-    if ((s.mode ?? 'strike') === 'strike' && currentPicker) {
-      const newStrikes = (currentPicker.strikes ?? 0) + 1
-      const eliminated = newStrikes >= 3
-      await supabase.from('session_players')
-        .update({ strikes: newStrikes, eliminated })
-        .eq('id', currentPicker.id)
+    // In strike mode, apply a strike to the correct picker using fresh DB data
+    if ((s.mode ?? 'strike') === 'strike') {
+      const freshPicker = getCurrentPicker(freshPlayers, s.guess_count ?? 0, s.pick_style ?? 'classic')
+      if (freshPicker) {
+        const newStrikes = (freshPicker.strikes ?? 0) + 1
+        const eliminated = newStrikes >= 3
+        await supabase.from('session_players')
+          .update({ strikes: newStrikes, eliminated })
+          .eq('id', freshPicker.id)
 
-      // Save undo state
-      setLastStrikeUndo({
-        playerId:      currentPicker.id,
-        prevStrikes:   currentPicker.strikes ?? 0,
-        prevEliminated: currentPicker.eliminated ?? false,
-        guessCount:    s.guess_count ?? 0,
-      })
-      setFeedback({ type: 'strike', message: `⏰ Time's up! ${currentPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
+        setLastStrikeUndo({
+          playerId:       freshPicker.id,
+          prevStrikes:    freshPicker.strikes ?? 0,
+          prevEliminated: freshPicker.eliminated ?? false,
+          guessCount:     s.guess_count ?? 0,
+        })
+        setFeedback({ type: 'strike', message: `⏰ Time's up! ${freshPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
 
-      // Check game over
-      const updatedPlayers = players.map(p =>
-        p.id === currentPicker.id ? { ...p, strikes: newStrikes, eliminated } : p
-      )
-      await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
+        const updatedPlayers = freshPlayers.map(p =>
+          p.id === freshPicker.id ? { ...p, strikes: newStrikes, eliminated } : p
+        )
+        await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
+      }
     }
 
     await reloadPlayers()
