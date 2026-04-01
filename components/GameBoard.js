@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { getGridCols } from '@/lib/gameUtils'
 
-export default function GameBoard({ answers, totalCount, revealedIds = new Set(), onGridWidth }) {
+export default function GameBoard({ answers, totalCount, revealedIds = new Set() }) {
   const cols = getGridCols(totalCount)
   const rows = Math.ceil(totalCount / cols)
   const containerRef = useRef(null)
@@ -12,21 +12,21 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    // Size cells based purely on available HEIGHT — width will follow
     const obs = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect
-      const byW = (width  - GAP * (cols - 1)) / cols
+      const { height } = entry.contentRect
       const byH = (height - GAP * (rows - 1)) / rows
-      const size = Math.floor(Math.min(byW, byH))
-      setCellSize(size)
-      // Tell parent exactly how wide the grid actually is
-      if (onGridWidth) onGridWidth(size * cols + GAP * (cols - 1))
+      setCellSize(Math.floor(byH))
     })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [cols, rows, onGridWidth])
+  }, [rows])
+
+  const gridWidth = cellSize > 0 ? cellSize * cols + GAP * (cols - 1) : 0
 
   return (
-    <div ref={containerRef} className="w-full h-full flex items-start justify-start pt-1">
+    // Container fills available height, width is determined by the grid inside
+    <div ref={containerRef} className="h-full" style={{ width: gridWidth || '100%' }}>
       {cellSize > 0 && (
         <div
           style={{

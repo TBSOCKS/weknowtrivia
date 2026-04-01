@@ -356,8 +356,8 @@ export default function GameSessionPage() {
       {/* Full-height content below nav */}
       <div className="flex-1 flex gap-3 px-3 py-3 min-h-0">
 
-        {/* Board — fills all available space */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        {/* Board — shrinks to grid content */}
+        <div className="flex-shrink-0 flex flex-col min-h-0" style={{ width: 'fit-content' }}>
           {/* Header */}
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
             <div>
@@ -384,12 +384,13 @@ export default function GameSessionPage() {
           </div>
 
           {/* Board fills remaining height */}
-          <div className="flex-1 border border-brand-border rounded-2xl p-3 min-h-0 overflow-hidden" style={{ background: '#0a0a10' }}>
+          <div className="flex-1 border border-brand-border rounded-2xl p-1 min-h-0 overflow-hidden" style={{ background: '#0a0a10' }}>
             {answers.length > 0 ? (
               <GameBoard
                 answers={answers}
                 totalCount={totalAnswers}
                 revealedIds={revealedIds}
+                onGridWidth={w => setBoardWidth(w)}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-brand-muted">
@@ -399,8 +400,8 @@ export default function GameSessionPage() {
           </div>
         </div>
 
-        {/* Right sidebar: guess input + players */}
-        <div className="w-80 flex flex-col gap-3 flex-shrink-0 min-h-0">
+        {/* Right sidebar: fills remaining space */}
+        <div className="flex-1 flex flex-col gap-3 min-h-0 min-w-0">
 
           {/* Guess input */}
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-3 flex-shrink-0">
