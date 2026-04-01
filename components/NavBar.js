@@ -12,9 +12,10 @@ export default function NavBar() {
   }
 
   const links = [
-    { href: '/host',                  label: 'Dashboard' },
-    { href: '/host/admin',            label: 'Admin'     },
-    { href: '/host/game/setup',       label: 'New Game'  },
+    { href: '/host',                  label: 'Dashboard'   },
+    { href: '/host/admin',            label: 'Admin'       },
+    { href: '/host/game/setup',       label: 'New Game'    },
+    { href: '/host/leaderboard',      label: 'Leaderboard' },
   ]
 
   return (
