@@ -23,7 +23,7 @@ export default function CastawaySearch({ onSelect, placeholder = 'Search castawa
       setLoading(true)
       const { data } = await supabase
         .from('castaways')
-        .select('id, name, castaway_id, seasons(name, version_season)')
+        .select('id, name, castaway_id, placement, seasons(id, name, version_season)')
         .ilike('name', `%${query}%`)
         .limit(20)
       setResults(data ?? [])
