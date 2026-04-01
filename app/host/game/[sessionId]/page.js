@@ -214,7 +214,7 @@ export default function GameSessionPage() {
         const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         const topScore = sorted[0].score ?? 0
         const tied = sorted.filter(p => (p.score ?? 0) === topScore)
-        if (tied.length > 1 && settings.mode !== 'round') {
+        if (tied.length > 1) {
           // Sudden death — don't end yet
           await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
           setSuddenDeath(true)
