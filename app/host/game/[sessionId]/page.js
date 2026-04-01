@@ -27,6 +27,11 @@ export default function GameSessionPage() {
   const [sdPlayers, setSdPlayers]       = useState([])
   const [sdGuessCount, setSdGuessCount] = useState(0)
   const [sdCorrect, setSdCorrect]       = useState(new Set()) // player ids correct this SD round
+  // Refs for SD state — used by timer closure to avoid stale values
+  const sdPlayersRef     = useRef([])
+  const sdGuessCountRef  = useRef(0)
+  const sdCorrectRef     = useRef(new Set())
+  const suddenDeathRef   = useRef(false)
   const [lastStrikeUndo, setLastStrikeUndo] = useState(null) // { playerId, prevStrikes, prevEliminated }
   const [lastTurnUndo, setLastTurnUndo]     = useState(null)  // { prevGuessCount } for round mode
 
@@ -151,26 +156,26 @@ export default function GameSessionPage() {
       const isLastInRound = newGuessCount % sdActive.length === 0
 
       setFeedback({ type: 'wrong', message: `⏰ Time's up! ${sdPicker?.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
-      setSdGuessCount(newGuessCount)
+      setSdGuessCountSync(newGuessCount)
 
       if (isLastInRound) {
         const survivors = sdActive.filter(p => sdCorrect.has(p.id))
         if (survivors.length === 0) {
-          setSdCorrect(new Set())
-          setSdGuessCount(0)
+          setSdCorrectSync(new Set())
+          setSdGuessCountSync(0)
           setFeedback({ type: 'wrong', message: '⏰ Everyone timed out — sudden death continues!' })
         } else if (survivors.length === 1) {
           const winnerPlayer = survivors[0]
           await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
           await saveLeaderboard(players, winnerPlayer)
-          setSuddenDeath(false)
+          setSuddenDeathSync(false)
           setWinner(winnerPlayer)
           setGameOver(true)
           return
         } else {
-          setSdPlayers(survivors.map(p => p.id))
-          setSdCorrect(new Set())
-          setSdGuessCount(0)
+          setSdPlayersSync(survivors.map(p => p.id))
+          setSdCorrectSync(new Set())
+          setSdGuessCountSync(0)
         }
         if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
       } else {
@@ -232,10 +237,10 @@ export default function GameSessionPage() {
           const topScore = sorted[0]?.score ?? 0
           const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
           if (tied.length > 1) {
-            setSuddenDeath(true)
-            setSdPlayers(tied.map(p => p.id))
-            setSdGuessCount(0)
-            setSdCorrect(new Set())
+            setSuddenDeathSync(true)
+            setSdPlayersSync(tied.map(p => p.id))
+            setSdGuessCountSync(0)
+            setSdCorrectSync(new Set())
             setLastTurnUndo(null)
             await reloadPlayers()
             if (s.timer_seconds) resetTimer(s.timer_seconds, true)
@@ -294,6 +299,12 @@ export default function GameSessionPage() {
     const secs = sess.data?.settings?.timer_seconds
     if (secs) resetTimer(secs)
   }
+
+  // Keep SD refs in sync with state
+  function setSdPlayersSync(v) { sdPlayersRef.current = v; setSdPlayersSync(v) }
+  function setSdGuessCountSync(v) { sdGuessCountRef.current = v; setSdGuessCountSync(v) }
+  function setSdCorrectSync(v) { sdCorrectRef.current = v; setSdCorrectSync(v) }
+  function setSuddenDeathSync(v) { suddenDeathRef.current = v; setSuddenDeathSync(v) }
 
   // Derived state
   const settings     = session?.settings ?? {}
@@ -378,9 +389,9 @@ export default function GameSessionPage() {
         if (tied.length > 1) {
           // Sudden death — don't end yet
           await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-          setSuddenDeath(true)
-          setSdPlayers(tied.map(p => p.id))
-          setSdGuessCount(0)
+          setSuddenDeathSync(true)
+          setSdPlayersSync(tied.map(p => p.id))
+          setSdGuessCountSync(0)
         } else {
           await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
           await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -406,9 +417,9 @@ export default function GameSessionPage() {
             const tied = sorted.filter(p => (p.score ?? 0) === topScore)
             if (tied.length > 1) {
               await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-              setSuddenDeath(true)
-              setSdPlayers(tied.map(p => p.id))
-              setSdGuessCount(0)
+              setSuddenDeathSync(true)
+              setSdPlayersSync(tied.map(p => p.id))
+              setSdGuessCountSync(0)
             } else {
               await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
               await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -484,9 +495,9 @@ export default function GameSessionPage() {
           const tied = sorted.filter(p => (p.score ?? 0) === topScore)
           if (tied.length > 1) {
             await supabase.from('game_sessions').update({ settings: { ...settings, guess_count: newGuessCount } }).eq('id', sessionId)
-            setSuddenDeath(true)
-            setSdPlayers(tied.map(p => p.id))
-            setSdGuessCount(0)
+            setSuddenDeathSync(true)
+            setSdPlayersSync(tied.map(p => p.id))
+            setSdGuessCountSync(0)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(players, sorted[0])
@@ -584,9 +595,9 @@ export default function GameSessionPage() {
         .update({ score: (sdPicker.score ?? 0) + 1 })
         .eq('id', sdPicker.id)
       const newCorrect = new Set([...sdCorrect, sdPicker.id])
-      setSdCorrect(newCorrect)
+      setSdCorrectSync(newCorrect)
       setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${sdPicker.personalities?.name?.split(' ')[0]} survives!` })
-      setSdGuessCount(newGuessCount)
+      setSdGuessCountSync(newGuessCount)
 
       // Reset timer for next SD player (unless this was the last guess in the round)
       if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
@@ -602,21 +613,21 @@ export default function GameSessionPage() {
           const updatedPlayers = players.map(p => p.id === winnerPlayer.id ? { ...p, score: (p.score ?? 0) + 1 } : p)
           await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
           await saveLeaderboard(updatedPlayers, winnerPlayer)
-          setSuddenDeath(false)
+          setSuddenDeathSync(false)
           setWinner(winnerPlayer)
           setGameOver(true)
         } else {
           // Multiple survivors — continue SD between them
-          setSdPlayers(survivors.map(p => p.id))
-          setSdCorrect(new Set())
-          setSdGuessCount(0)
+          setSdPlayersSync(survivors.map(p => p.id))
+          setSdCorrectSync(new Set())
+          setSdGuessCountSync(0)
           setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
         }
       }
     } else {
       // Wrong — eliminated from SD (no point awarded)
       setFeedback({ type: 'wrong', message: `✗ Wrong! ${sdPicker.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
-      setSdGuessCount(newGuessCount)
+      setSdGuessCountSync(newGuessCount)
 
       // Reset timer for next SD player
       if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
@@ -628,20 +639,20 @@ export default function GameSessionPage() {
         const survivors = sdActive.filter(p => sdCorrect.has(p.id))
         if (survivors.length === 0) {
           // Everyone missed — reset and continue with all current SD players
-          setSdCorrect(new Set())
-          setSdGuessCount(0)
+          setSdCorrectSync(new Set())
+          setSdGuessCountSync(0)
           setFeedback({ type: 'wrong', message: '✗ Everyone missed — sudden death continues!' })
         } else if (survivors.length === 1) {
           const winnerPlayer = survivors[0]
           await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
           await saveLeaderboard(players, winnerPlayer)
-          setSuddenDeath(false)
+          setSuddenDeathSync(false)
           setWinner(winnerPlayer)
           setGameOver(true)
         } else {
-          setSdPlayers(survivors.map(p => p.id))
-          setSdCorrect(new Set())
-          setSdGuessCount(0)
+          setSdPlayersSync(survivors.map(p => p.id))
+          setSdCorrectSync(new Set())
+          setSdGuessCountSync(0)
           setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
         }
       }
@@ -687,10 +698,10 @@ export default function GameSessionPage() {
 
       if (tied.length > 1) {
         // Tie — go to sudden death instead of ending
-        setSuddenDeath(true)
-        setSdPlayers(tied.map(p => p.id))
-        setSdGuessCount(0)
-        setSdCorrect(new Set())
+        setSuddenDeathSync(true)
+        setSdPlayersSync(tied.map(p => p.id))
+        setSdGuessCountSync(0)
+        setSdCorrectSync(new Set())
         return true
       }
 
