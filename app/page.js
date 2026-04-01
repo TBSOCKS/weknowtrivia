@@ -13,24 +13,12 @@ function HomeContent() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (searchParams.get('redirect') === 'host') handleHostLogin()
+    if (searchParams.get('redirect') === 'host') window.location.href = '/host'
   }, [searchParams])
 
   async function handleHostLogin(e) {
     e?.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: '' }),
-      })
-      if (res.ok) router.push('/host')
-    } catch {
-      setError('Connection error. Please try again.')
-    }
-    setLoading(false)
+    window.location.href = '/host'
   }
 
   function handleJoin(e) {
