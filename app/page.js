@@ -13,24 +13,20 @@ function HomeContent() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (searchParams.get('redirect') === 'host') setView('host')
+    if (searchParams.get('redirect') === 'host') handleHostLogin()
   }, [searchParams])
 
   async function handleHostLogin(e) {
-    e.preventDefault()
+    e?.preventDefault()
     setLoading(true)
     setError('')
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: '' }),
       })
-      if (res.ok) {
-        router.push('/host')
-      } else {
-        setError('Incorrect password. Try again.')
-      }
+      if (res.ok) router.push('/host')
     } catch {
       setError('Connection error. Please try again.')
     }
@@ -78,8 +74,9 @@ function HomeContent() {
         {view === 'home' && (
           <div className="flex flex-col gap-4 animate-fade-in">
             <button
-              onClick={() => router.push('/host')}
-              className="group relative overflow-hidden bg-brand-panel border border-brand-border rounded-2xl p-6 text-left hover:border-brand-red transition-all duration-300 hover:shadow-[0_0_30px_rgba(230,57,70,0.15)]"
+              onClick={handleHostLogin}
+              disabled={loading}
+              className="group relative overflow-hidden bg-brand-panel border border-brand-border rounded-2xl p-6 text-left hover:border-brand-red transition-all duration-300 hover:shadow-[0_0_30px_rgba(230,57,70,0.15)] disabled:opacity-50"
             >
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-xl bg-brand-red/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
