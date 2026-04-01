@@ -215,25 +215,43 @@ export default function BootOrderGamePage() {
       // Save used season to settings so it won't repeat
       const prevUsed = session.settings?.used_season_ids ?? []
       const newUsed  = [...new Set([...prevUsed, q.season.id])]
+      const updatedSettings = { ...(session.settings ?? {}), used_season_ids: newUsed }
       await supabase.from('game_sessions')
-        .update({ settings: { ...(session.settings ?? {}), used_season_ids: newUsed } })
+        .update({ settings: updatedSettings })
         .eq('id', sessionId)
-      setSession(prev => ({ ...prev, settings: { ...prev.settings, used_season_ids: newUsed } }))
+      setSession(prev => ({ ...prev, settings: updatedSettings }))
 
-      // Create round in DB
-      const roundNum = (session.settings?.current_round ?? 1)
-      const { data: round } = await supabase.from('game_rounds').insert({
+      // Use a unique round number — for tiebreakers, go beyond total_rounds
+      const totalRoundsCount = session.settings?.total_rounds ?? 10
+      let roundNum = session.settings?.current_round ?? 1
+      if (tiebreaker) {
+        // Find the highest existing round number and add 1
+        const { data: existingRounds } = await supabase
+          .from('game_rounds').select('round_number')
+          .eq('session_id', sessionId)
+          .order('round_number', { ascending: false })
+          .limit(1)
+        roundNum = (existingRounds?.[0]?.round_number ?? totalRoundsCount) + 1
+      }
+
+      const { data: round, error: roundErr } = await supabase.from('game_rounds').insert({
         session_id:    sessionId,
         round_number:  roundNum,
         question_data: {
-          season_id:          q.season.id,
-          version_season:     q.season.version_season,
-          placement:          q.placement,
+          season_id:           q.season.id,
+          version_season:      q.season.version_season,
+          placement:           q.placement,
           correct_castaway_id: q.castaway.id,
         },
         status: 'active',
       }).select().single()
-      setCurrentRound(round.data ?? round)
+
+      if (roundErr || !round) {
+        console.error('Round insert failed:', roundErr)
+        setPhase('idle')
+        return
+      }
+      setCurrentRound(round)
 
       setPhase('answering')
 
