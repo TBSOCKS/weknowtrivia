@@ -112,7 +112,13 @@ export default function GameSessionPage() {
     return () => clearInterval(timerRef.current)
   }, [session?.id])
 
-  function resetTimer(seconds) {
+  function resetTimer(seconds, forSuddenDeath = false) {
+    // Skip timer reset if SD timer is disabled and we're in sudden death
+    if (forSuddenDeath && settings?.timer_sd_enabled === false) {
+      clearInterval(timerRef.current)
+      setTimeLeft(null)
+      return
+    }
     clearInterval(timerRef.current)
     pausedRef.current = false
     setPaused(false)
@@ -195,7 +201,7 @@ export default function GameSessionPage() {
             setSdCorrect(new Set())
             setLastTurnUndo(null)
             await reloadPlayers()
-            if (s.timer_seconds) resetTimer(s.timer_seconds)
+            if (s.timer_seconds) resetTimer(s.timer_seconds, true)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(freshPlayers, sorted[0])
@@ -603,6 +609,10 @@ export default function GameSessionPage() {
     }
   }
 
+  // Should the timer run during sudden death?
+  const sdTimerActive = settings.timer_seconds && settings.timer_sd_enabled !== false
+
+
   // Check if strike game is mathematically over given a player snapshot
   async function checkStrikeGameOver(updatedPlayers, remainingAnswers) {
     const stillActive = updatedPlayers.filter(p => !p.eliminated)
@@ -838,7 +848,7 @@ export default function GameSessionPage() {
                 ↩ Undo timer strike
               </button>
             )}
-            {lastTurnUndo && !suddenDeath && (
+            {lastTurnUndo && (
               <button onClick={undoTurnAdvance}
                 className="mt-1.5 w-full text-xs text-brand-amber hover:text-amber-400 border border-brand-amber/30 hover:border-brand-amber/60 rounded-lg py-1 transition-colors">
                 ↩ Undo turn advance
