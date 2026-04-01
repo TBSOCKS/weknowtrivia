@@ -17,6 +17,11 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
           PICKING
         </div>
       )}
+      {turnOrder != null && (
+        <div className="absolute top-1.5 left-1.5 bg-brand-bg/80 text-white font-display text-lg leading-none w-6 h-6 rounded-full flex items-center justify-center border border-brand-border/60">
+          {turnOrder}
+        </div>
+      )}
       {player.eliminated && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-border text-brand-muted text-[9px] font-display tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap">
           OUT
@@ -34,15 +39,10 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
         )}
       </div>
 
-      {/* Name + turn order */}
+      {/* Name */}
       <div className="text-white text-xs font-medium text-center leading-tight truncate w-full px-1">
         {personality?.name?.split(' ')[0] ?? 'Player'}
       </div>
-      {turnOrder != null && (
-        <div className="text-brand-muted text-[9px] uppercase tracking-widest -mt-1">
-          Turn {turnOrder}
-        </div>
-      )}
 
       {/* Score */}
       <div className="font-display text-3xl text-white leading-none">{player.score ?? 0}</div>

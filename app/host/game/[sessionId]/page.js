@@ -17,6 +17,7 @@ export default function GameSessionPage() {
   const [personalities, setPersonalities] = useState({})     // id → personality
   const [answers, setAnswers]           = useState([])       // list_answers with castaways
   const [revealedIds, setRevealedIds]   = useState(new Set())
+  const [listTitle, setListTitle]       = useState('')
   const [feedback, setFeedback]         = useState(null)     // { type: 'correct'|'wrong'|'strike', message }
   const [loading, setLoading]           = useState(true)
   const [submitting, setSubmitting]     = useState(false)
