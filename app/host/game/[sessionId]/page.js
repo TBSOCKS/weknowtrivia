@@ -174,10 +174,35 @@ export default function GameSessionPage() {
       }
     }
 
-    // For round mode, save undo state and show feedback
+    // For round mode, save undo state, show feedback, and check round end
     if ((s.mode ?? 'strike') !== 'strike') {
+      const newGuessCount = (s.guess_count ?? 0) + 1
       setLastTurnUndo({ prevGuessCount: s.guess_count ?? 0 })
       setFeedback({ type: 'wrong', message: `⏰ Time's up! Turn advanced.` })
+
+      // Check if rounds are exhausted
+      if (s.total_rounds) {
+        const activePlayers = freshPlayers.filter(p => !p.eliminated)
+        const totalGuesses  = s.total_rounds * activePlayers.length
+        if (newGuessCount >= totalGuesses) {
+          const sorted   = [...freshPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          const topScore = sorted[0]?.score ?? 0
+          const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
+          if (tied.length > 1) {
+            setSuddenDeath(true)
+            setSdPlayers(tied.map(p => p.id))
+            setSdGuessCount(0)
+            setSdCorrect(new Set())
+          } else {
+            await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+            await saveLeaderboard(freshPlayers, sorted[0])
+            setWinner(sorted[0])
+            setGameOver(true)
+          }
+          await reloadPlayers()
+          return
+        }
+      }
     }
 
     await reloadPlayers()
