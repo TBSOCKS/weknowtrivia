@@ -3,27 +3,18 @@ import { useEffect, useState } from 'react'
 import NavBar from '@/components/NavBar'
 import { supabase } from '@/lib/supabase'
 
-const MODE_LABELS = {
-  lists:      'Lists',
-  boot_order: 'Boot Order',
-}
-
-const SHOW_ICONS = {
-  'survivor':      '🌴',
-  'big-brother':   '👁️',
-  'the-challenge': '🏆',
-  'drag-race':     '👑',
-}
+const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order' }
+const SHOW_ICONS  = { 'survivor': '🌴', 'big-brother': '👁️', 'the-challenge': '🏆', 'drag-race': '👑' }
 
 export default function LeaderboardPage() {
-  const [shows, setShows]           = useState([])
-  const [entries, setEntries]       = useState([])
+  const [shows, setShows]               = useState([])
+  const [entries, setEntries]           = useState([])
   const [personalities, setPersonalities] = useState({})
-  const [loading, setLoading]       = useState(true)
+  const [loading, setLoading]           = useState(true)
   const [selectedShow, setSelectedShow] = useState('')
   const [selectedMode, setSelectedMode] = useState('lists')
-  const [managing, setManaging]           = useState(false)
-  const [deleting, setDeleting]           = useState(null)
+  const [managing, setManaging]         = useState(false)
+  const [deleting, setDeleting]         = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -33,7 +24,7 @@ export default function LeaderboardPage() {
       ])
       const showData = showRes.data ?? []
       setShows(showData)
-      if (showData.length > 0 && !selectedShow) setSelectedShow(showData[0].id)
+      if (showData.length > 0) setSelectedShow(showData[0].id)
       const pMap = {}
       ;(persRes.data ?? []).forEach(p => { pMap[p.id] = p })
       setPersonalities(pMap)
@@ -57,8 +48,6 @@ export default function LeaderboardPage() {
     loadEntries()
   }, [selectedShow, selectedMode])
 
-  const modes = ['lists', 'boot_order']
-
   async function handleDeleteEntry(id) {
     if (!confirm('Remove this player from the leaderboard?')) return
     setDeleting(id)
@@ -68,31 +57,37 @@ export default function LeaderboardPage() {
   }
 
   async function handleClearAll() {
-    if (!confirm(`Clear ALL leaderboard records for this show + mode? This cannot be undone.`)) return
+    if (!confirm('Clear ALL leaderboard records for this show + mode? This cannot be undone.')) return
     await supabase.from('leaderboard')
-      .delete()
-      .eq('show_id', selectedShow)
-      .eq('mode', selectedMode)
+      .delete().eq('show_id', selectedShow).eq('mode', selectedMode)
     setEntries([])
   }
+
+  const modes = ['lists', 'boot_order']
 
   return (
     <div className="min-h-screen bg-brand-bg">
       <NavBar />
       <div className="max-w-4xl mx-auto px-4 py-10">
-        <div className="mb-8 flex items-start justify-between">
+
+        {/* Header */}
+        <div className="flex items-start justify-between mb-8">
           <div>
-          <h1 className="font-display text-6xl text-white tracking-wide">LEADERBOARD</h1>
-          <p className="text-brand-muted mt-1">All-time standings</p>
+            <h1 className="font-display text-6xl text-white tracking-wide">LEADERBOARD</h1>
+            <p className="text-brand-muted mt-1">All-time standings</p>
           </div>
-        <button onClick={() => setManaging(v => !v)}
-          className={`self-start px-4 py-2 rounded-xl border font-display text-lg tracking-wide transition-all ${managing ? 'border-brand-red bg-brand-red/10 text-brand-red' : 'border-brand-border text-brand-muted hover:text-white'}`}>
-          {managing ? 'DONE' : 'MANAGE'}
-        </button>
+          <button onClick={() => setManaging(v => !v)}
+            className={`px-4 py-2 rounded-xl border font-display text-lg tracking-wide transition-all ${
+              managing
+                ? 'border-brand-red bg-brand-red/10 text-brand-red'
+                : 'border-brand-border text-brand-muted hover:text-white'
+            }`}>
+            {managing ? 'DONE' : 'MANAGE'}
+          </button>
+        </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          {/* Show tabs */}
+        <div className="flex flex-wrap gap-3 mb-6">
           <div className="flex gap-2 flex-wrap">
             {shows.map(s => (
               <button key={s.id} onClick={() => setSelectedShow(s.id)}
@@ -106,8 +101,6 @@ export default function LeaderboardPage() {
               </button>
             ))}
           </div>
-
-          {/* Mode tabs */}
           <div className="flex gap-2">
             {modes.map(m => (
               <button key={m} onClick={() => setSelectedMode(m)}
@@ -122,6 +115,16 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
+        {/* Clear all */}
+        {managing && entries.length > 0 && (
+          <div className="flex justify-end mb-3">
+            <button onClick={handleClearAll}
+              className="text-sm text-brand-red hover:underline border border-brand-red/30 hover:border-brand-red/60 px-3 py-1.5 rounded-lg transition-colors">
+              Clear all records for this view
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         {loading ? (
           <div className="text-brand-muted text-center py-20">Loading…</div>
@@ -133,7 +136,7 @@ export default function LeaderboardPage() {
           </div>
         ) : (
           <div className="bg-brand-panel border border-brand-border rounded-2xl overflow-hidden">
-            {/* Header */}
+            {/* Column headers */}
             <div className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-brand-border">
               <div className="col-span-1 text-brand-muted text-xs uppercase tracking-widest">#</div>
               <div className="col-span-5 text-brand-muted text-xs uppercase tracking-widest">Player</div>
@@ -142,31 +145,22 @@ export default function LeaderboardPage() {
               <div className="col-span-2 text-brand-muted text-xs uppercase tracking-widest text-right">Points</div>
             </div>
 
-            {/* Rows */}
             {entries.map((entry, i) => {
-              const pers = personalities[entry.personality_id]
-              const winPct = entry.games_played > 0
-                ? Math.round((entry.wins / entry.games_played) * 100)
-                : 0
-              const isTop = i === 0
+              const pers   = personalities[entry.personality_id]
+              const winPct = entry.games_played > 0 ? Math.round((entry.wins / entry.games_played) * 100) : 0
+              const isTop  = i === 0
               const isTied = i > 0 && entries[i - 1].wins === entry.wins && entries[i - 1].total_points === entry.total_points
 
               return (
                 <div key={entry.id}
-                  className={`grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-brand-border/50 last:border-0 transition-colors hover:bg-brand-card ${
-                    isTop ? 'bg-brand-amber/5' : ''
-                  }`}>
+                  className={`grid grid-cols-12 gap-4 px-5 py-4 items-center border-b border-brand-border/50 last:border-0 hover:bg-brand-card transition-colors ${isTop ? 'bg-brand-amber/5' : ''}`}>
+
                   {/* Rank */}
                   <div className="col-span-1">
-                    {isTop ? (
-                      <span className="text-2xl">🥇</span>
-                    ) : i === 1 ? (
-                      <span className="text-2xl">🥈</span>
-                    ) : i === 2 ? (
-                      <span className="text-2xl">🥉</span>
-                    ) : (
-                      <span className="font-display text-2xl text-brand-muted">{isTied ? '=' : i + 1}</span>
-                    )}
+                    {i === 0 ? <span className="text-2xl">🥇</span>
+                    : i === 1 ? <span className="text-2xl">🥈</span>
+                    : i === 2 ? <span className="text-2xl">🥉</span>
+                    : <span className="font-display text-2xl text-brand-muted">{isTied ? '=' : i + 1}</span>}
                   </div>
 
                   {/* Player */}
@@ -195,12 +189,12 @@ export default function LeaderboardPage() {
                     <span className="font-display text-3xl text-brand-muted">{entry.games_played}</span>
                   </div>
 
-                  {/* Points / Delete */}
-                  <div className="col-span-2 text-right flex items-center justify-end gap-2">
+                  {/* Points + delete */}
+                  <div className="col-span-2 flex items-center justify-end gap-2">
                     <span className="font-display text-3xl text-white">{entry.total_points}</span>
                     {managing && (
                       <button onClick={() => handleDeleteEntry(entry.id)} disabled={deleting === entry.id}
-                        className="text-brand-red/50 hover:text-brand-red transition-colors text-lg disabled:opacity-50 ml-1">
+                        className="text-brand-red/50 hover:text-brand-red transition-colors text-lg disabled:opacity-50">
                         {deleting === entry.id ? '…' : '✕'}
                       </button>
                     )}
