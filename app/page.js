@@ -96,36 +96,6 @@ function HomeContent() {
           </div>
         )}
 
-        {/* Host Login */}
-        {view === 'host' && (
-          <div className="bg-brand-panel border border-brand-border rounded-2xl p-8 animate-slide-up">
-            <button onClick={() => { setView('home'); setError('') }}
-                    className="text-brand-muted hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
-              ← Back
-            </button>
-            <h2 className="font-display text-4xl text-white tracking-wide mb-1">HOST LOGIN</h2>
-            <p className="text-brand-muted text-sm mb-6">Enter the host password to continue</p>
-            <form onSubmit={handleHostLogin} className="flex flex-col gap-4">
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Password"
-                autoFocus
-                className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3 text-white placeholder-brand-muted focus:outline-none focus:border-brand-red transition-colors"
-              />
-              {error && <p className="text-brand-red text-sm">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-brand-red hover:bg-red-600 disabled:opacity-50 text-white font-display text-2xl tracking-widest py-3 rounded-xl transition-colors"
-              >
-                {loading ? 'LOGGING IN…' : 'ENTER'}
-              </button>
-            </form>
-          </div>
-        )}
-
         {/* Join Game */}
         {view === 'join' && (
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-8 animate-slide-up">
