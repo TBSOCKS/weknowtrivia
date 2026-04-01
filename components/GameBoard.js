@@ -6,32 +6,37 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
   const cols = getGridCols(totalCount)
   const rows = Math.ceil(totalCount / cols)
   const containerRef = useRef(null)
-  const [cellSize, setCellSize] = useState(0)
-  const GAP = 6
+  const [dims, setDims] = useState({ cellSize: 0, gapX: 6, gapY: 6 })
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
-      const maxByWidth  = (width  - GAP * (cols - 1)) / cols
-      const maxByHeight = (height - GAP * (rows - 1)) / rows
-      setCellSize(Math.floor(Math.min(maxByWidth, maxByHeight)))
+      const minGap = 6
+      const cellByWidth  = (width  - minGap * (cols - 1)) / cols
+      const cellByHeight = (height - minGap * (rows - 1)) / rows
+      const cellSize = Math.floor(Math.min(cellByWidth, cellByHeight))
+      // Distribute remaining space evenly as gap
+      const gapX = cols > 1 ? (width  - cols * cellSize) / (cols - 1) : 0
+      const gapY = rows > 1 ? (height - rows * cellSize) / (rows - 1) : 0
+      setDims({ cellSize, gapX, gapY })
     })
     obs.observe(el)
     return () => obs.disconnect()
   }, [cols, rows])
 
+  const { cellSize, gapX, gapY } = dims
+
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full flex items-center justify-center"
-    >
+    <div ref={containerRef} className="w-full h-full">
       <div
         className="grid"
         style={{
           gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
-          gap: `${GAP}px`,
+          gridTemplateRows:    `repeat(${rows}, ${cellSize}px)`,
+          columnGap: `${gapX}px`,
+          rowGap:    `${gapY}px`,
         }}
       >
         {answers.map((ans, idx) => {
@@ -47,7 +52,6 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
               style={{ width: cellSize, height: cellSize }}
             >
               <div className="board-cell-inner">
-
                 {/* Front: season label */}
                 <div className="board-cell-front cell-shimmer border border-white/10 flex items-center justify-center p-1 text-center">
                   <span className="text-white font-display tracking-wide leading-tight"
@@ -68,17 +72,12 @@ export default function GameBoard({ answers, totalCount, revealedIds = new Set()
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  <span
-                    className="relative text-white font-bold drop-shadow-md pb-1 z-10"
-                    style={{ fontSize: Math.max(7, Math.floor(cellSize * 0.12)) }}
-                  >
+                  <span className="relative text-white font-bold drop-shadow-md pb-1 z-10"
+                        style={{ fontSize: Math.max(7, Math.floor(cellSize * 0.12)) }}>
                     {ans.castaways?.name?.split(' ')[0]}
                   </span>
-                  {revealed && (
-                    <div className="absolute inset-0 bg-brand-green/20 pointer-events-none" />
-                  )}
+                  {revealed && <div className="absolute inset-0 bg-brand-green/20 pointer-events-none" />}
                 </div>
-
               </div>
             </div>
           )

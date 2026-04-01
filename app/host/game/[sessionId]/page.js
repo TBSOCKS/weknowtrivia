@@ -229,18 +229,43 @@ export default function GameSessionPage() {
 
       await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
 
-      // Check if game over (all eliminated or rounds exhausted)
-      const updatedPlayers = players.map(p =>
-        p.id === currentPicker?.id
-          ? { ...p, strikes: (p.strikes ?? 0) + 1, eliminated: (p.strikes ?? 0) + 1 >= 3 }
-          : p
-      )
-      const stillActive = updatedPlayers.filter(p => !p.eliminated)
-      if (gameMode === 'strike' && stillActive.length <= 1) {
-        await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-        setGameOver(true)
-        const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-        setWinner(sorted[0])
+      if (gameMode === 'strike') {
+        const updatedPlayers = players.map(p =>
+          p.id === currentPicker?.id
+            ? { ...p, strikes: (p.strikes ?? 0) + 1, eliminated: (p.strikes ?? 0) + 1 >= 3 }
+            : p
+        )
+        const stillActive = updatedPlayers.filter(p => !p.eliminated)
+        const remaining = totalAnswers - revealedIds.size
+
+        // Game over when: all eliminated, or only 1 left and they lead, 
+        // or leader's gap over 2nd place > remaining answers
+        let isOver = false
+        if (stillActive.length === 0) {
+          isOver = true
+        } else if (stillActive.length === 1) {
+          // Only 1 active — check if they can be caught
+          const activePlayer = stillActive[0]
+          const eliminated = updatedPlayers.filter(p => p.eliminated)
+          const topElimScore = Math.max(0, ...eliminated.map(p => p.score ?? 0))
+          // Game over if active player can't be beaten even if they miss all remaining
+          if ((activePlayer.score ?? 0) > topElimScore) isOver = true
+          // Or if no eliminated players, they're last one standing
+          if (eliminated.length === 0) isOver = true
+        } else {
+          // Multiple active — check if leader's lead is mathematically insurmountable
+          const sorted = [...stillActive].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          const leader = sorted[0]
+          const second = sorted[1]
+          if ((leader.score ?? 0) - (second.score ?? 0) > remaining) isOver = true
+        }
+
+        if (isOver) {
+          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+          setGameOver(true)
+          const sorted = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          setWinner(sorted[0])
+        }
       }
 
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
