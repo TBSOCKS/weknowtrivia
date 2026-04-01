@@ -90,13 +90,14 @@ export default function BootOrderSetupPage() {
     const code = gameType === 'code' ? generateCode() : null
 
     const settings = {
-      timer_seconds:   timerEnabled ? timerSeconds : null,
-      total_rounds:    totalRounds,
-      current_round:   1,
-      placement_min:   placementMin,
-      placement_max:   placementMax,
-      season_pool:     includedSeasonIds,
-      game_type:       gameType,
+      timer_seconds:    timerEnabled ? timerSeconds : null,
+      total_rounds:     totalRounds,
+      current_round:    1,
+      placement_min:    placementMin,
+      placement_max:    placementMax,
+      season_pool:      includedSeasonIds,
+      game_type:        gameType,
+      track_leaderboard: trackLeaderboard,
     }
 
     const { data: session, error: sessErr } = await supabase
@@ -226,9 +227,11 @@ export default function BootOrderSetupPage() {
                     onChange={e => {
                       if (e.target.value === '') { setPlacementMax(0); return }
                       const n = parseInt(e.target.value)
-                      if (!isNaN(n)) setPlacementMax(Math.max(n, placementMin))
+                      if (!isNaN(n)) setPlacementMax(n)
                     }}
-                    onBlur={() => { if (!placementMax || placementMax < 1) setPlacementMax(18) }}
+                    onBlur={() => {
+                      if (!placementMax || placementMax < placementMin) setPlacementMax(Math.max(placementMin, 18))
+                    }}
                     className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-2.5 text-white text-center font-display text-2xl focus:outline-none focus:border-brand-amber" />
                 </div>
               </div>
