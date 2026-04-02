@@ -24,14 +24,14 @@ export default function GameSessionPage() {
   const [gameOver, setGameOver]         = useState(false)
   const [winner, setWinner]             = useState(null)
   const [suddenDeath, setSuddenDeath]   = useState(false)
-  const [sdPlayers, setSdPlayers]       = useState([])
-  const [sdGuessCount, setSdGuessCount] = useState(0)
-  const [sdCorrect, setSdCorrect]       = useState(new Set()) // player ids correct this SD round
-  // Refs for SD state — used by timer closure to avoid stale values
-  const sdPlayersRef     = useRef([])
-  const sdGuessCountRef  = useRef(0)
-  const sdCorrectRef     = useRef(new Set())
-  const suddenDeathRef   = useRef(false)
+  const [sdPlayers, setSdPlayers]       = useState([])   // player IDs in SD, in turn order
+  const [sdCurrent, setSdCurrent]       = useState(0)    // index of current SD player
+  const [sdSurvivors, setSdSurvivors]   = useState([])   // IDs who survived this round
+  // Refs so timer closure always reads current values
+  const sdPlayersRef    = useRef([])
+  const sdCurrentRef    = useRef(0)
+  const sdSurvivorsRef  = useRef([])
+  const suddenDeathRef  = useRef(false)
   const [lastStrikeUndo, setLastStrikeUndo] = useState(null) // { playerId, prevStrikes, prevEliminated }
   const [lastTurnUndo, setLastTurnUndo]     = useState(null)  // { prevGuessCount } for round mode
 
@@ -148,44 +148,18 @@ export default function GameSessionPage() {
   }
 
   async function advanceTurnOnTimeout() {
-    // If in sudden death, handle separately
-    if (suddenDeath) {
-      const sdActive = players.filter(p => sdPlayers.includes(p.id))
-      const sdPicker = sdActive[sdGuessCount % Math.max(sdActive.length, 1)]
-      const newGuessCount = sdGuessCount + 1
-      const isLastInRound = newGuessCount % sdActive.length === 0
-
-      setFeedback({ type: 'wrong', message: `⏰ Time's up! ${sdPicker?.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
-      setSdGuessCountSync(newGuessCount)
-
-      if (isLastInRound) {
-        const survivors = sdActive.filter(p => sdCorrect.has(p.id))
-        if (survivors.length === 0) {
-          setSdCorrectSync(new Set())
-          setSdGuessCountSync(0)
-          setFeedback({ type: 'wrong', message: '⏰ Everyone timed out — sudden death continues!' })
-        } else if (survivors.length === 1) {
-          const winnerPlayer = survivors[0]
-          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-          await saveLeaderboard(players, winnerPlayer)
-          setSuddenDeathSync(false)
-          setWinner(winnerPlayer)
-          setGameOver(true)
-          return
-        } else {
-          setSdPlayersSync(survivors.map(p => p.id))
-          setSdCorrectSync(new Set())
-          setSdGuessCountSync(0)
-        }
-        if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
-      } else {
-        // More SD players to go — reset timer for next one
-        if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
-      }
+    // If in sudden death, use the clean advanceSdTurn(false) path
+    if (suddenDeathRef.current) {
+      const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
+      const sdPicker   = players.find(p => p.id === sdPickerId)
+      const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
+      setFeedback({ type: 'wrong', message: `⏰ Time's up! ${name} is eliminated from sudden death this round!` })
+      await advanceSdTurn(false)
+      await reloadPlayers()
       return
     }
 
-    // Fetch fresh state from DB to avoid stale React state (especially after undo)
+    // Fetch fresh state from DB (avoids stale React state, especially after undo)
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('settings').eq('id', sessionId).single(),
       supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
@@ -197,7 +171,7 @@ export default function GameSessionPage() {
     const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
     await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
 
-    // In strike mode, apply a strike to the correct picker using fresh DB data
+    // Strike mode — apply strike to current picker
     if ((s.mode ?? 'strike') === 'strike') {
       const freshPicker = getCurrentPicker(freshPlayers, s.guess_count ?? 0, s.pick_style ?? 'classic')
       if (freshPicker) {
@@ -206,15 +180,13 @@ export default function GameSessionPage() {
         await supabase.from('session_players')
           .update({ strikes: newStrikes, eliminated })
           .eq('id', freshPicker.id)
-
         setLastStrikeUndo({
-          playerId:       freshPicker.id,
-          prevStrikes:    freshPicker.strikes ?? 0,
+          playerId: freshPicker.id,
+          prevStrikes: freshPicker.strikes ?? 0,
           prevEliminated: freshPicker.eliminated ?? false,
-          guessCount:     s.guess_count ?? 0,
+          guessCount: s.guess_count ?? 0,
         })
         setFeedback({ type: 'strike', message: `⏰ Time's up! ${freshPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
-
         const updatedPlayers = freshPlayers.map(p =>
           p.id === freshPicker.id ? { ...p, strikes: newStrikes, eliminated } : p
         )
@@ -222,28 +194,24 @@ export default function GameSessionPage() {
       }
     }
 
-    // For round mode, save undo state, show feedback, and check round end
+    // Round mode — advance turn and check if game/SD should start
     if ((s.mode ?? 'strike') !== 'strike') {
       const newGuessCount = (s.guess_count ?? 0) + 1
       setLastTurnUndo({ prevGuessCount: s.guess_count ?? 0 })
       setFeedback({ type: 'wrong', message: `⏰ Time's up! Turn advanced.` })
 
-      // Check if rounds are exhausted
       if (s.total_rounds) {
-        const activePlayers = freshPlayers.filter(p => !p.eliminated)
-        const totalGuesses  = s.total_rounds * activePlayers.length
+        const active = freshPlayers.filter(p => !p.eliminated)
+        const totalGuesses = s.total_rounds * active.length
         if (newGuessCount >= totalGuesses) {
           const sorted   = [...freshPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
           const topScore = sorted[0]?.score ?? 0
           const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
           if (tied.length > 1) {
-            setSuddenDeathSync(true)
-            setSdPlayersSync(tied.map(p => p.id))
-            setSdGuessCountSync(0)
-            setSdCorrectSync(new Set())
+            enterSuddenDeath(tied.map(p => p.id))
             setLastTurnUndo(null)
             await reloadPlayers()
-            if (s.timer_seconds) resetTimer(s.timer_seconds, true)
+            if (s.timer_seconds && s.timer_sd_enabled !== false) resetTimer(s.timer_seconds)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(freshPlayers, sorted[0])
@@ -302,8 +270,6 @@ export default function GameSessionPage() {
 
   // Keep SD refs in sync with state
   function setSdPlayersSync(v) { sdPlayersRef.current = v; setSdPlayersSync(v) }
-  function setSdGuessCountSync(v) { sdGuessCountRef.current = v; setSdGuessCountSync(v) }
-  function setSdCorrectSync(v) { sdCorrectRef.current = v; setSdCorrectSync(v) }
   function setSuddenDeathSync(v) { suddenDeathRef.current = v; setSuddenDeathSync(v) }
 
   // Derived state
@@ -314,9 +280,9 @@ export default function GameSessionPage() {
   const currentPicker = getCurrentPicker(players, guessCount, pickStyle)
 
   // During sudden death, override the current picker
-  const sdActive = suddenDeath ? players.filter(p => sdPlayers.includes(p.id)) : []
-  const sdCurrentPicker = suddenDeath && sdActive.length > 0
-    ? sdActive[sdGuessCount % sdActive.length]
+  const sdActivePlayers = suddenDeath ? players.filter(p => sdPlayers.includes(p.id)) : []
+  const sdCurrentPicker = suddenDeath && sdActivePlayers.length > 0
+    ? sdActivePlayers[sdCurrent % Math.max(sdActivePlayers.length, 1)]
     : null
   const effectivePicker = suddenDeath ? sdCurrentPicker : currentPicker
 
@@ -389,9 +355,7 @@ export default function GameSessionPage() {
         if (tied.length > 1) {
           // Sudden death — don't end yet
           await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-          setSuddenDeathSync(true)
-          setSdPlayersSync(tied.map(p => p.id))
-          setSdGuessCountSync(0)
+          enterSuddenDeath(tied.map(p => p.id))
         } else {
           await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
           await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -417,9 +381,7 @@ export default function GameSessionPage() {
             const tied = sorted.filter(p => (p.score ?? 0) === topScore)
             if (tied.length > 1) {
               await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-              setSuddenDeathSync(true)
-              setSdPlayersSync(tied.map(p => p.id))
-              setSdGuessCountSync(0)
+          enterSuddenDeath(tied.map(p => p.id))
             } else {
               await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
               await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -495,9 +457,7 @@ export default function GameSessionPage() {
           const tied = sorted.filter(p => (p.score ?? 0) === topScore)
           if (tied.length > 1) {
             await supabase.from('game_sessions').update({ settings: { ...settings, guess_count: newGuessCount } }).eq('id', sessionId)
-            setSuddenDeathSync(true)
-            setSdPlayersSync(tied.map(p => p.id))
-            setSdGuessCountSync(0)
+          enterSuddenDeath(tied.map(p => p.id))
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
             await saveLeaderboard(players, sorted[0])
@@ -564,101 +524,38 @@ export default function GameSessionPage() {
   }
 
   // Handle a sudden death guess
-  // Logic: everyone gets one guess per round. Correct = survive. Wrong = eliminated.
-  // After all SD players have guessed: 1 survivor → wins; 2+ survive → continue between them; 0 survive → everyone gets another round.
   async function handleSuddenDeathGuess(castaway) {
     if (submitting) return
     setSubmitting(true)
     setFeedback(null)
     try {
-
-    const sdActive = players.filter(p => sdPlayers.includes(p.id))
-    const sdPicker = sdActive[sdGuessCount % sdActive.length]
-    const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
-
-    if (isAlreadyRevealed) {
-      setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
-      setSubmitting(false)
-      return
-    }
-
-    const matchedAnswer = answers.find(a => a.castaway_id === castaway.id && !revealedIds.has(a.id))
-    const newGuessCount = sdGuessCount + 1
-    const isLastInRound = newGuessCount % sdActive.length === 0
-
-    if (matchedAnswer) {
-      // Correct — reveal it, award point, mark as survivor for this round
-      const newRevealed = new Set(revealedIds)
-      newRevealed.add(matchedAnswer.id)
-      setRevealedIds(newRevealed)
-      await supabase.from('session_players')
-        .update({ score: (sdPicker.score ?? 0) + 1 })
-        .eq('id', sdPicker.id)
-      const newCorrect = new Set([...sdCorrect, sdPicker.id])
-      setSdCorrectSync(newCorrect)
-      setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${sdPicker.personalities?.name?.split(' ')[0]} survives!` })
-      setSdGuessCountSync(newGuessCount)
-
-      // Reset timer for next SD player (unless this was the last guess in the round)
-      if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
-        resetTimer(settings.timer_seconds)
+      const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
+      if (isAlreadyRevealed) {
+        setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
+        setSubmitting(false)
+        return
       }
 
-      if (isLastInRound) {
-        // Round over — check survivors
-        const survivors = sdActive.filter(p => newCorrect.has(p.id))
-        if (survivors.length === 1) {
-          // One survivor wins
-          const winnerPlayer = survivors[0]
-          const updatedPlayers = players.map(p => p.id === winnerPlayer.id ? { ...p, score: (p.score ?? 0) + 1 } : p)
-          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-          await saveLeaderboard(updatedPlayers, winnerPlayer)
-          setSuddenDeathSync(false)
-          setWinner(winnerPlayer)
-          setGameOver(true)
-        } else {
-          // Multiple survivors — continue SD between them
-          setSdPlayersSync(survivors.map(p => p.id))
-          setSdCorrectSync(new Set())
-          setSdGuessCountSync(0)
-          setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
-        }
-      }
-    } else {
-      // Wrong — eliminated from SD (no point awarded)
-      setFeedback({ type: 'wrong', message: `✗ Wrong! ${sdPicker.personalities?.name?.split(' ')[0]} is eliminated from sudden death!` })
-      setSdGuessCountSync(newGuessCount)
+      const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
+      const sdPicker   = players.find(p => p.id === sdPickerId)
+      const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
+      const matchedAnswer = answers.find(a => a.castaway_id === castaway.id && !revealedIds.has(a.id))
 
-      // Reset timer for next SD player
-      if (!isLastInRound && settings.timer_seconds && settings.timer_sd_enabled !== false) {
-        resetTimer(settings.timer_seconds)
+      if (matchedAnswer) {
+        const newRevealed = new Set(revealedIds)
+        newRevealed.add(matchedAnswer.id)
+        setRevealedIds(newRevealed)
+        await supabase.from('session_players')
+          .update({ score: (sdPicker?.score ?? 0) + 1 })
+          .eq('id', sdPickerId)
+        setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${name} survives!` })
+        await advanceSdTurn(true)
+      } else {
+        setFeedback({ type: 'wrong', message: `✗ Wrong! ${name} is eliminated from sudden death this round!` })
+        await advanceSdTurn(false)
       }
 
-      if (isLastInRound) {
-        // Round over — check survivors
-        const survivors = sdActive.filter(p => sdCorrect.has(p.id))
-        if (survivors.length === 0) {
-          // Everyone missed — reset and continue with all current SD players
-          setSdCorrectSync(new Set())
-          setSdGuessCountSync(0)
-          setFeedback({ type: 'wrong', message: '✗ Everyone missed — sudden death continues!' })
-        } else if (survivors.length === 1) {
-          const winnerPlayer = survivors[0]
-          await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-          await saveLeaderboard(players, winnerPlayer)
-          setSuddenDeathSync(false)
-          setWinner(winnerPlayer)
-          setGameOver(true)
-        } else {
-          setSdPlayersSync(survivors.map(p => p.id))
-          setSdCorrectSync(new Set())
-          setSdGuessCountSync(0)
-          setFeedback({ type: 'correct', message: `${survivors.length} players survive — sudden death continues!` })
-        }
-      }
-    }
-
-    await reloadPlayers()
+      await reloadPlayers()
     } catch (err) {
       console.error('SD error:', err)
       setFeedback({ type: 'wrong', message: 'Something went wrong — try again.' })
@@ -666,9 +563,6 @@ export default function GameSessionPage() {
       setSubmitting(false)
     }
   }
-
-  // Should the timer run during sudden death?
-  const sdTimerActive = settings.timer_seconds && settings.timer_sd_enabled !== false
 
 
   // Check if strike game is mathematically over given a player snapshot
@@ -698,10 +592,7 @@ export default function GameSessionPage() {
 
       if (tied.length > 1) {
         // Tie — go to sudden death instead of ending
-        setSuddenDeathSync(true)
-        setSdPlayersSync(tied.map(p => p.id))
-        setSdGuessCountSync(0)
-        setSdCorrectSync(new Set())
+          enterSuddenDeath(tied.map(p => p.id))
         return true
       }
 
@@ -875,9 +766,9 @@ export default function GameSessionPage() {
                 <div className="font-display text-base text-brand-red tracking-wide">⚡ SUDDEN DEATH</div>
                 {(() => {
                   const sdActive = players.filter(p => sdPlayers.includes(p.id))
-                  const picker = sdActive[sdGuessCount % Math.max(sdActive.length, 1)]
+                  const picker = sdActive[sdCurrent % Math.max(sdActive.length, 1)]
                   const name = personalities[picker?.personality_id]?.name?.split(' ')[0]
-                  return <div className="text-brand-muted text-xs mt-0.5">{name}'s guess{sdCorrect.size > 0 ? ` · ${sdCorrect.size} survived` : ''}</div>
+                  return <div className="text-brand-muted text-xs mt-0.5">{name}'s guess{sdSurvivors.length > 0 ? ` · ${sdSurvivors.length} survived so far` : ''}</div>
                 })()}
               </div>
             )}
