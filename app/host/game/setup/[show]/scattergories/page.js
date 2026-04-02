@@ -53,6 +53,15 @@ export default function ScattergoriesSetupPage() {
     load()
   }, [show])
 
+  // Sync selectedPlayers array when playerCount changes
+  useEffect(() => {
+    setSelectedPlayers(prev => {
+      const next = [...prev]
+      while (next.length < playerCount) next.push('')
+      return next.slice(0, playerCount)
+    })
+  }, [playerCount])
+
   // Sync round categories array when totalRounds changes
   useEffect(() => {
     setRoundCategories(prev => {
