@@ -249,7 +249,6 @@ export default function BootOrderSetupPage() {
                   <input type="range" min={1} max={50} value={totalRounds}
                     onChange={e => setTotalRounds(parseInt(e.target.value))} className="w-full accent-brand-amber" />
                 </div>
-                </div>
               </div>
             </div>
           </div>
