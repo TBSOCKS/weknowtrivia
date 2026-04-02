@@ -27,6 +27,9 @@ export default function ListsSetupPage() {
   const [pickStyle, setPickStyle]         = useState('classic')
   const [totalRounds, setTotalRounds]     = useState(10)
   const [trackLeaderboard, setTrackLeaderboard] = useState(false)
+  const [timerEnabled, setTimerEnabled]         = useState(false)
+  const [timerSeconds, setTimerSeconds]         = useState(60)
+  const [timerSdEnabled, setTimerSdEnabled]     = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -77,7 +80,8 @@ export default function ListsSetupPage() {
     const list = lists.find(l => l.id === selectedList)
     const settings = {
       list_id:              selectedList,
-      timer_seconds:        null,
+      timer_seconds:        timerEnabled ? timerSeconds : null,
+      timer_sd_enabled:     timerEnabled ? timerSdEnabled : false,
       mode:                 gameMode,
       pick_style:           pickStyle,
       total_rounds:         gameMode === 'round' ? totalRounds : null,
@@ -222,6 +226,42 @@ export default function ListsSetupPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Timer */}
+            <div className="bg-brand-panel border border-brand-border rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="font-display text-2xl text-white tracking-wide">TIMER</h2>
+                  <p className="text-brand-muted text-xs mt-0.5">Countdown per turn</p>
+                </div>
+                <button onClick={() => setTimerEnabled(v => !v)}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${timerEnabled ? 'bg-brand-red' : 'bg-brand-border'}`}>
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${timerEnabled ? 'left-6' : 'left-0.5'}`} />
+                </button>
+              </div>
+              {timerEnabled && (
+                <div className="flex flex-col gap-3 pt-3 border-t border-brand-border">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <label className="text-brand-muted text-xs uppercase tracking-widest">Seconds per turn:</label>
+                      <input type="number" min={5} max={300} value={timerSeconds}
+                        onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 5) setTimerSeconds(v) }}
+                        className="w-16 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-red" />
+                    </div>
+                    <input type="range" min={5} max={300} step={5} value={timerSeconds}
+                      onChange={e => setTimerSeconds(parseInt(e.target.value))} className="w-full accent-brand-red" />
+                    <div className="flex justify-between text-brand-muted text-xs mt-1"><span>5s</span><span>5m</span></div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-brand-muted text-xs uppercase tracking-widest">Timer active in sudden death</label>
+                    <button onClick={() => setTimerSdEnabled(v => !v)}
+                      className={`w-10 h-5 rounded-full transition-colors relative ${timerSdEnabled ? 'bg-brand-amber' : 'bg-brand-border'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${timerSdEnabled ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Leaderboard tracking */}
