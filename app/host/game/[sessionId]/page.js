@@ -296,6 +296,7 @@ export default function GameSessionPage() {
     setFeedback(null)
     setLastStrikeUndo(null)
     setLastTurnUndo(null)
+    try {
 
     // Check if this castaway is in the answer list and not yet revealed
     const matchedAnswer = answers.find(
@@ -472,7 +473,12 @@ export default function GameSessionPage() {
 
     // Reload players only — revealedIds managed in state
     await reloadPlayers()
-    setSubmitting(false)
+    } catch (err) {
+      console.error('handleGuess error:', err)
+      setFeedback({ type: 'wrong', message: 'Something went wrong — please try again.' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // Save leaderboard if tracking is enabled
