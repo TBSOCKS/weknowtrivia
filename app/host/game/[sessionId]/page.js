@@ -792,43 +792,30 @@ export default function GameSessionPage() {
                 ↩ Undo turn advance
               </button>
             )}
-          </div>          {/* Turn order strip */}
+          </div>          {/* Turn order strip — fixed positions, highlight moves */}
           {!suddenDeath && (
-            <div className="flex-shrink-0 bg-brand-panel border border-brand-border rounded-xl px-3 py-2 flex items-center gap-2 overflow-x-auto">
-              <span className="text-brand-muted text-[10px] uppercase tracking-widest whitespace-nowrap mr-1">Turn order</span>
-              {(() => {
-                // Show the next N turns (up to 8) starting from current
-                const activeTurnPlayers = [...players]
-                  .filter(p => !p.eliminated)
-                  .sort((a, b) => a.turn_order - b.turn_order)
-                const totalActive = activeTurnPlayers.length
-                if (totalActive === 0) return null
-                const upcoming = []
-                for (let i = 0; i < Math.min(8, totalActive); i++) {
-                  const idx = pickStyle === 'snake'
-                    ? (() => {
-                        const pos = (guessCount + i) % (totalActive <= 1 ? 1 : totalActive * 2)
-                        return pos < totalActive ? pos : totalActive * 2 - 1 - pos
-                      })()
-                    : (guessCount + i) % totalActive
-                  upcoming.push({ player: activeTurnPlayers[idx], offset: i })
-                }
-                return upcoming.map(({ player, offset }) => {
-                  const pers = personalities[player?.personality_id]
-                  const isCurrent = offset === 0
+            <div className="flex-shrink-0 bg-brand-panel border border-brand-border rounded-xl px-4 py-2.5 flex items-center gap-3 overflow-x-auto">
+              <span className="text-brand-muted text-xs uppercase tracking-widest whitespace-nowrap mr-1">Turn order</span>
+              {[...players]
+                .sort((a, b) => a.turn_order - b.turn_order)
+                .map(p => {
+                  const pers = personalities[p.personality_id]
+                  const isCurrent = effectivePicker?.id === p.id
                   return (
-                    <div key={`${player?.id}-${offset}`} className={`flex flex-col items-center gap-0.5 flex-shrink-0 transition-all ${isCurrent ? 'opacity-100' : 'opacity-40'}`}>
-                      <div className={`w-7 h-7 rounded-full overflow-hidden border-2 ${isCurrent ? 'border-brand-red' : 'border-brand-border'}`}>
+                    <div key={p.id} className={`flex flex-col items-center gap-1 flex-shrink-0 transition-all duration-300 ${p.eliminated ? 'opacity-20' : isCurrent ? 'opacity-100' : 'opacity-40'}`}>
+                      <div className={`rounded-full overflow-hidden border-2 transition-all duration-300 ${isCurrent ? 'w-10 h-10 border-brand-red shadow-[0_0_8px_rgba(230,57,70,0.6)]' : 'w-8 h-8 border-brand-border'}`}>
                         {pers?.photo_url
                           ? <img src={pers.photo_url} className="w-full h-full object-cover" alt="" />
-                          : <div className="w-full h-full bg-brand-card flex items-center justify-center text-[9px] text-brand-muted">{pers?.name?.[0]}</div>
+                          : <div className="w-full h-full bg-brand-card flex items-center justify-center text-xs text-brand-muted">{pers?.name?.[0]}</div>
                         }
                       </div>
-                      {isCurrent && <div className="w-1 h-1 rounded-full bg-brand-red" />}
+                      <span className={`text-[10px] font-medium whitespace-nowrap ${isCurrent ? 'text-white' : 'text-brand-muted'}`}>
+                        {pers?.name?.split(' ')[0]}
+                      </span>
                     </div>
                   )
                 })
-              })()}
+              }
             </div>
           )}
 
