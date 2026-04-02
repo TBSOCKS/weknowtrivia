@@ -687,7 +687,7 @@ export default function GameSessionPage() {
     <div className="h-screen bg-brand-bg flex flex-col overflow-hidden relative">
       <NavBar />      {/* Full-height content below nav */}
       <div className="flex-1 flex gap-3 px-3 py-3 min-h-0">        {/* Board — shrinks to grid content */}
-        <div className="flex-shrink-0 flex flex-col min-h-0" style={{ width: 'fit-content' }}>
+        <div className="flex-[2] flex flex-col min-h-0">
           {/* Header */}
           <div className="flex items-center justify-between mb-2 flex-shrink-0">
             <div>
@@ -722,7 +722,7 @@ export default function GameSessionPage() {
               </button>
             </div>
           </div>          {/* Board fills remaining height */}
-          <div className="flex-1 border border-brand-border rounded-2xl p-1 min-h-0 overflow-hidden" style={{ background: '#0a0a10' }}>
+          <div className="flex-1 border border-brand-border rounded-2xl p-1 min-h-0 overflow-hidden flex items-center justify-start" style={{ background: '#0a0a10' }}>
             {answers.length > 0 ? (
               <GameBoard
                 answers={answers}
@@ -737,7 +737,7 @@ export default function GameSessionPage() {
             )}
           </div>
         </div>        {/* Right sidebar: fills remaining space */}
-        <div className="flex-1 flex flex-col gap-3 min-h-0 min-w-0">          {/* Guess input */}
+        <div className="flex-[3] flex flex-col gap-3 min-h-0 min-w-0">          {/* Guess input */}
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-3 flex-shrink-0">
             {/* Current picker */}
             {!suddenDeath && effectivePicker && personalities[effectivePicker.personality_id] && (
