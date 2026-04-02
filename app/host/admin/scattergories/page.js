@@ -152,6 +152,76 @@ export default function ScatCategoriesPage() {
     setCategories(prev => prev.filter(c => c.id !== catId))
   }
 
+  // ── BACKFILL ─────────────────────────────────────────────────────────────
+  const [backfilling, setBackfilling]     = useState(false)
+  const [backfillResult, setBackfillResult] = useState(null)
+
+  async function handleBackfill() {
+    setBackfilling(true)
+    setBackfillResult(null)
+
+    // Fetch all season entries with no castaway_id linked
+    const { data: missingEntries } = await supabase
+      .from('scat_entries')
+      .select('id, display_name, season_number, scat_categories(type)')
+      .is('castaway_id', null)
+      .not('season_number', 'is', null)
+
+    const seasonEntries = (missingEntries ?? []).filter(e => e.scat_categories?.type === 'season')
+
+    if (seasonEntries.length === 0) {
+      setBackfillResult({ total: 0, matched: 0 })
+      setBackfilling(false)
+      return
+    }
+
+    // Build castaway lookup
+    const { data: castawayData } = await supabase
+      .from('castaways')
+      .select('id, name, seasons(season_number)')
+
+    const castawayLookup = {}
+    ;(castawayData ?? []).forEach(c => {
+      const sn = c.seasons?.season_number
+      if (sn) {
+        castawayLookup[`${c.name.toLowerCase().trim()}|${sn}`] = c.id
+      }
+    })
+
+    // Match and collect updates
+    const updates = []
+    for (const entry of seasonEntries) {
+      const nameLower = entry.display_name.toLowerCase().trim()
+      const sn = entry.season_number
+
+      let castawayId = castawayLookup[`${nameLower}|${sn}`] ?? null
+      if (!castawayId) {
+        const normalized = nameLower.replace(/[-'.]/g, ' ').replace(/\s+/g, ' ').trim()
+        const fallback = Object.entries(castawayLookup).find(([k]) => {
+          const [kName, kSeason] = k.split('|')
+          return parseInt(kSeason) === sn &&
+            kName.replace(/[-'.]/g, ' ').replace(/\s+/g, ' ').trim() === normalized
+        })
+        if (fallback) castawayId = fallback[1]
+      }
+
+      if (castawayId) updates.push({ id: entry.id, castaway_id: castawayId })
+    }
+
+    // Batch update matched entries
+    let updateErrors = 0
+    for (const u of updates) {
+      const { error } = await supabase
+        .from('scat_entries')
+        .update({ castaway_id: u.castaway_id })
+        .eq('id', u.id)
+      if (error) updateErrors++
+    }
+
+    setBackfillResult({ total: seasonEntries.length, matched: updates.length - updateErrors })
+    setBackfilling(false)
+  }
+
   if (loading) return <div className="min-h-screen bg-brand-bg flex items-center justify-center text-brand-muted">Loading…</div>
 
   return (
@@ -160,6 +230,30 @@ export default function ScatCategoriesPage() {
       <div className="max-w-5xl mx-auto px-4 py-10">
         <Link href="/host/admin" className="text-brand-muted hover:text-white text-sm mb-6 inline-flex items-center gap-1 transition-colors">← Admin</Link>
         <h1 className="font-display text-5xl text-white tracking-wide mb-8">SCATTERGORIES CATEGORIES</h1>
+
+        {/* Backfill card */}
+        <div className="bg-brand-panel border border-brand-border rounded-2xl p-5 mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-display text-xl text-white tracking-wide">BACKFILL CASTAWAY PHOTOS</h2>
+            <p className="text-brand-muted text-xs mt-0.5">
+              Links existing season entries to castaway records so photos show in-game.
+              Safe to run multiple times.
+            </p>
+            {backfillResult && (
+              <p className={`text-xs mt-1.5 ${backfillResult.matched > 0 ? 'text-brand-green' : 'text-brand-muted'}`}>
+                {backfillResult.total === 0
+                  ? 'All entries already linked — nothing to do.'
+                  : `✓ Matched ${backfillResult.matched} of ${backfillResult.total} unlinked entries`}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="flex-shrink-0 bg-brand-amber hover:bg-amber-400 disabled:opacity-50 text-black font-display text-lg tracking-widest px-5 py-2.5 rounded-xl transition-colors">
+            {backfilling ? 'RUNNING…' : 'RUN BACKFILL'}
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: existing categories */}
