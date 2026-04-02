@@ -15,7 +15,6 @@ export default function ScatCategoriesPage() {
   const [shows, setShows]             = useState([])
   const [categories, setCategories]   = useState([])
   const [personalities, setPersonalities] = useState([])
-  const [seasons, setSeasons]         = useState([])
   const [loading, setLoading]         = useState(true)
 
   // New category form
@@ -34,16 +33,14 @@ export default function ScatCategoriesPage() {
 
   useEffect(() => {
     async function load() {
-      const [showRes, catRes, persRes, seasRes] = await Promise.all([
+      const [showRes, catRes, persRes] = await Promise.all([
         supabase.from('shows').select('*').order('name'),
         supabase.from('scat_categories').select('*').order('name'),
         supabase.from('personalities').select('id, name').order('name'),
-        supabase.from('seasons').select('id, name, season_number, version_season, show_id').order('season_number'),
       ])
       setShows(showRes.data ?? [])
       setCategories(catRes.data ?? [])
       setPersonalities(persRes.data ?? [])
-      setSeasons(seasRes.data ?? [])
       if (showRes.data?.length) setSelectedShow(showRes.data[0].id)
       setLoading(false)
     }
@@ -70,6 +67,22 @@ export default function ScatCategoriesPage() {
     const rows = parseCSV(csvText)
     if (rows.length === 0) { setError('No valid rows found in CSV'); setImporting(false); return }
 
+    // For season type, build a castaway lookup keyed by "name_lower|season_number"
+    let castawayLookup = {}
+    if (type === 'season') {
+      const { data: castawayData } = await supabase
+        .from('castaways')
+        .select('id, name, seasons(season_number)')
+      ;(castawayData ?? []).forEach(c => {
+        const sn = c.seasons?.season_number
+        if (sn) {
+          // Primary key: exact lowercase name
+          const key = `${c.name.toLowerCase().trim()}|${sn}`
+          castawayLookup[key] = c.id
+        }
+      })
+    }
+
     // Create category
     const { data: cat, error: catErr } = await supabase.from('scat_categories').insert({
       show_id: selectedShow, name: name.trim(), type, entry_count: 0,
@@ -84,11 +97,10 @@ export default function ScatCategoriesPage() {
       if (type === 'career') {
         const [entryName, pts] = row
         const points = parseInt(pts) || 0
-        // Try to match personality by name (case-insensitive)
-        const pers = personalities.find(p => p.name.toLowerCase() === entryName.toLowerCase())
+        const pers = personalities.find(p => p.name.toLowerCase() === entryName.toLowerCase().trim())
         entryRows.push({
           category_id:    cat.id,
-          display_name:   entryName,
+          display_name:   entryName.trim(),
           personality_id: pers?.id ?? null,
           points,
         })
@@ -97,15 +109,28 @@ export default function ScatCategoriesPage() {
         const [entryName, seasonNum, pts] = row
         const sNum   = parseInt(seasonNum) || 0
         const points = parseInt(pts) || 0
-        const season = seasons.find(s => s.season_number === sNum)
+
+        // Try exact match first, then strip hyphens/punctuation as fallback
+        const nameLower = entryName.toLowerCase().trim()
+        let castawayId = castawayLookup[`${nameLower}|${sNum}`] ?? null
+        if (!castawayId) {
+          const normalized = nameLower.replace(/[-'.]/g, ' ').replace(/\s+/g, ' ').trim()
+          const fallback = Object.entries(castawayLookup).find(([k]) => {
+            const [kName, kSeason] = k.split('|')
+            return parseInt(kSeason) === sNum &&
+              kName.replace(/[-'.]/g, ' ').replace(/\s+/g, ' ').trim() === normalized
+          })
+          if (fallback) castawayId = fallback[1]
+        }
+
         entryRows.push({
-          category_id:  cat.id,
-          display_name: entryName,
+          category_id:   cat.id,
+          display_name:  entryName.trim(),
           season_number: sNum,
-          castaway_id:  null, // best-effort match done later
+          castaway_id:   castawayId,
           points,
         })
-        if (season) matched++
+        if (castawayId) matched++
       }
     }
 
@@ -245,7 +270,7 @@ export default function ScatCategoriesPage() {
               {error && <p className="text-brand-red text-sm">{error}</p>}
               {importResult && (
                 <div className="bg-brand-green/10 border border-brand-green/30 rounded-xl p-3 text-sm text-brand-green">
-                  ✓ Imported {importResult.total} entries · {importResult.matched} personality matches found
+                  ✓ Imported {importResult.total} entries · {importResult.matched} photo matches found
                 </div>
               )}
 
