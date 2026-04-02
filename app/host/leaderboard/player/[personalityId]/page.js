@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import PersonalitySearch from '@/components/PersonalitySearch'
 import Link from 'next/link'
 
-const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order' }
+const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order', scattergories: 'Scattergories' }
 const SHOW_ICONS  = { 'survivor': '🌴', 'big-brother': '👁️', 'the-challenge': '🏆', 'drag-race': '👑' }
 
 export default function PlayerProfilePage() {

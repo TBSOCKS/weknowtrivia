@@ -5,7 +5,7 @@ import NavBar from '@/components/NavBar'
 import { supabase } from '@/lib/supabase'
 import PersonalitySearch from '@/components/PersonalitySearch'
 
-const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order' }
+const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order', scattergories: 'Scattergories' }
 const SHOW_ICONS  = { 'survivor': '🌴', 'big-brother': '👁️', 'the-challenge': '🏆', 'drag-race': '👑' }
 const SORT_OPTIONS = [
   { key: 'wins',         label: 'Wins'     },
@@ -265,7 +265,7 @@ export default function LeaderboardPage() {
               }`}>
               ALL MODES
             </button>
-            {['lists', 'boot_order'].map(m => (
+            {['lists', 'boot_order', 'scattergories'].map(m => (
               <button key={m} onClick={() => setSelectedMode(m)}
                 className={`px-4 py-2 rounded-xl border font-display text-lg tracking-wide transition-all ${
                   selectedMode === m ? 'border-brand-red bg-brand-red/10 text-brand-red' : 'border-brand-border text-brand-muted hover:text-white'
