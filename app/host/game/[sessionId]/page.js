@@ -239,8 +239,10 @@ export default function GameSessionPage() {
     const secs = sess.data?.settings?.timer_seconds
     if (secs) resetTimer(secs)
   }  // Keep SD refs in sync with state
-  function setSdPlayersSync(v) { sdPlayersRef.current = v; sdPlayersRef.current = v; setSdPlayers(v)
-  function setSuddenDeathSync(v) { suddenDeathRef.current = v; setSuddenDeathSync(v) }  // Derived state
+  function setSdPlayersSync(v)   { sdPlayersRef.current = v;   setSdPlayers(v) }
+  function setSdCurrentSync(v)   { sdCurrentRef.current = v;   setSdCurrent(v) }
+  function setSdSurvivorsSync(v) { sdSurvivorsRef.current = v; setSdSurvivors(v) }
+  function setSuddenDeathSync(v) { suddenDeathRef.current = v; setSuddenDeath(v) }  // Derived state
   const settings     = session?.settings ?? {}
   const gameMode     = settings.mode ?? 'strike'
   const pickStyle    = settings.pick_style ?? 'classic'
@@ -252,9 +254,13 @@ export default function GameSessionPage() {
   const sdCurrentPicker = suddenDeath && sdActivePlayers.length > 0
     ? sdActivePlayers[sdCurrent % Math.max(sdActivePlayers.length, 1)]
     : null
-  const effectivePicker = suddenDeath ? sdCurrentPicker : currentPicker  const activePlayers  = players.filter(p => !p.eliminated)
+  const effectivePicker = suddenDeath ? sdCurrentPicker : currentPicker
+
+  const activePlayers  = players.filter(p => !p.eliminated)
   const totalAnswers   = answers.length
-  const revealedCount  = revealedIds.size  async function handleGuess(castaway) {
+  const revealedCount  = revealedIds.size
+
+  async function handleGuess(castaway) {
     if (submitting || !session) return
     setSubmitting(true)
     setFeedback(null)
@@ -270,7 +276,9 @@ export default function GameSessionPage() {
       .eq('session_id', sessionId)
       .eq('status', 'active')
       .single()
-    const roundId = roundData?.id    if (matchedAnswer) {
+    const roundId = roundData?.id
+
+    if (matchedAnswer) {
       // CORRECT
       const newRevealed = new Set(revealedIds)
       newRevealed.add(matchedAnswer.id)
@@ -280,7 +288,9 @@ export default function GameSessionPage() {
           .from('session_players')
           .update({ score: (currentPicker.score ?? 0) + 1 })
           .eq('id', currentPicker.id)
-      }      if (roundId) {
+      }
+
+      if (roundId) {
         await supabase.from('game_answers').insert({
           round_id:          roundId,
           session_player_id: currentPicker?.id,
@@ -336,7 +346,9 @@ export default function GameSessionPage() {
             }
           }
         }
-      }      if (settings.timer_seconds) resetTimer(settings.timer_seconds)
+      }
+
+      if (settings.timer_seconds) resetTimer(settings.timer_seconds)
     } else {
       // WRONG
       const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
@@ -345,7 +357,9 @@ export default function GameSessionPage() {
         setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
     setSubmitting(false)
         return
-      }      if (roundId) {
+      }
+
+      if (roundId) {
         await supabase.from('game_answers').insert({
           round_id:          roundId,
           session_player_id: currentPicker?.id,
@@ -355,7 +369,9 @@ export default function GameSessionPage() {
         })
       }      // Strike logic
       const newGuessCount = guessCount + 1
-      let newSettings = { ...settings, guess_count: newGuessCount }      if (gameMode === 'strike' && currentPicker) {
+      let newSettings = { ...settings, guess_count: newGuessCount }
+
+      if (gameMode === 'strike' && currentPicker) {
         const newStrikes = (currentPicker.strikes ?? 0) + 1
         const eliminated = newStrikes >= 3
         await supabase.from('session_players')
@@ -397,7 +413,9 @@ export default function GameSessionPage() {
     setGameOver(true)
           }
         }
-      }      if (settings.timer_seconds) resetTimer(settings.timer_seconds)
+      }
+
+      if (settings.timer_seconds) resetTimer(settings.timer_seconds)
     }    // Reload players only — revealedIds managed in state
     await reloadPlayers()
     } catch (err) {
@@ -568,9 +586,7 @@ export default function GameSessionPage() {
     await saveLeaderboard(players, sorted[0])
     setWinner(sorted[0])
     setGameOver(true)
-  }
-
-  if (loading) return (
+  }  if (loading) return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center text-brand-muted">Loading…</div>
   )
 
