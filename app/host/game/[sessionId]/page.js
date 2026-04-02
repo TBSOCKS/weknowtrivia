@@ -32,11 +32,15 @@ export default function GameSessionPage() {
   const sdSurvivorsRef  = useRef([])
   const suddenDeathRef  = useRef(false)
   const [lastStrikeUndo, setLastStrikeUndo] = useState(null) // { playerId, prevStrikes, prevEliminated }
-  const [lastTurnUndo, setLastTurnUndo]     = useState(null)  // { prevGuessCount } for round mode  // Timer
+  const [lastTurnUndo, setLastTurnUndo]     = useState(null)
+
+  // { prevGuessCount } for round mode  // Timer
   const [timeLeft, setTimeLeft]         = useState(null)
   const [paused, setPaused]             = useState(false)
   const timerRef                        = useRef(null)
-  const pausedRef                       = useRef(false)  // Initial full load
+  const pausedRef                       = useRef(false)
+
+  // Initial full load
   const load = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
@@ -76,7 +80,9 @@ export default function GameSessionPage() {
     setRevealedIds(revealed)
     }
     setLoading(false)
-  }, [sessionId, router])  // Reload only players/scores after each guess — never touches revealedIds
+  }, [sessionId, router])
+
+  // Reload only players/scores after each guess — never touches revealedIds
   const reloadPlayers = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
@@ -88,12 +94,18 @@ export default function GameSessionPage() {
     const pMap = {}
     playersData.forEach(p => { pMap[p.personality_id] = p.personalities })
     setPersonalities(pMap)
-  }, [sessionId])  useEffect(() => { load() }, [load])  // Start timer when session loads with timer setting
+  }, [sessionId])
+
+  useEffect(() => { load() }, [load])
+
+  // Start timer when session loads with timer setting
   useEffect(() => {
     if (!session?.settings?.timer_seconds) return
     resetTimer(session.settings.timer_seconds)
     return () => clearInterval(timerRef.current)
-  }, [session?.id])  function resetTimer(seconds, forSuddenDeath = false) {
+  }, [session?.id])
+
+  function resetTimer(seconds, forSuddenDeath = false) {
     // Skip timer reset if SD timer is disabled and we're in sudden death
     if (forSuddenDeath && settings?.timer_sd_enabled === false) {
       clearInterval(timerRef.current)
@@ -558,7 +570,9 @@ export default function GameSessionPage() {
     setGameOver(true)
   }  if (loading) return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center text-brand-muted">Loading…</div>
-  )  // GAME OVER screen
+  )
+
+  // GAME OVER screen
   if (gameOver) {
     const winnerPersonality = winner ? personalities[winner.personality_id] : null
     const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
