@@ -160,25 +160,38 @@ export default function ScatCategoriesPage() {
     setBackfilling(true)
     setBackfillResult(null)
 
-    // Fetch all season entries with no castaway_id linked
-    const { data: missingEntries } = await supabase
+    // Fetch all entries that have a season_number but no castaway_id
+    // (season_number being set is what distinguishes season entries from career entries)
+    const { data: missingEntries, error: fetchErr } = await supabase
       .from('scat_entries')
-      .select('id, display_name, season_number, scat_categories(type)')
+      .select('id, display_name, season_number')
       .is('castaway_id', null)
       .not('season_number', 'is', null)
 
-    const seasonEntries = (missingEntries ?? []).filter(e => e.scat_categories?.type === 'season')
-
-    if (seasonEntries.length === 0) {
-      setBackfillResult({ total: 0, matched: 0 })
+    if (fetchErr) {
+      setBackfillResult({ error: fetchErr.message })
       setBackfilling(false)
       return
     }
 
-    // Build castaway lookup
-    const { data: castawayData } = await supabase
+    const seasonEntries = missingEntries ?? []
+
+    if (seasonEntries.length === 0) {
+      setBackfillResult({ total: 0, matched: 0, castaways: 0 })
+      setBackfilling(false)
+      return
+    }
+
+    // Build castaway lookup keyed by "name_lower|season_number"
+    const { data: castawayData, error: castErr } = await supabase
       .from('castaways')
       .select('id, name, seasons(season_number)')
+
+    if (castErr) {
+      setBackfillResult({ error: castErr.message })
+      setBackfilling(false)
+      return
+    }
 
     const castawayLookup = {}
     ;(castawayData ?? []).forEach(c => {
@@ -188,13 +201,16 @@ export default function ScatCategoriesPage() {
       }
     })
 
-    // Match and collect updates
+    // Match entries to castaways
     const updates = []
+    const unmatched = []
     for (const entry of seasonEntries) {
       const nameLower = entry.display_name.toLowerCase().trim()
       const sn = entry.season_number
 
       let castawayId = castawayLookup[`${nameLower}|${sn}`] ?? null
+
+      // Fuzzy fallback: strip hyphens, apostrophes, periods
       if (!castawayId) {
         const normalized = nameLower.replace(/[-'.]/g, ' ').replace(/\s+/g, ' ').trim()
         const fallback = Object.entries(castawayLookup).find(([k]) => {
@@ -205,10 +221,14 @@ export default function ScatCategoriesPage() {
         if (fallback) castawayId = fallback[1]
       }
 
-      if (castawayId) updates.push({ id: entry.id, castaway_id: castawayId })
+      if (castawayId) {
+        updates.push({ id: entry.id, castaway_id: castawayId })
+      } else {
+        unmatched.push(`${entry.display_name} (S${sn})`)
+      }
     }
 
-    // Batch update matched entries
+    // Batch update in groups of 50
     let updateErrors = 0
     for (const u of updates) {
       const { error } = await supabase
@@ -218,7 +238,12 @@ export default function ScatCategoriesPage() {
       if (error) updateErrors++
     }
 
-    setBackfillResult({ total: seasonEntries.length, matched: updates.length - updateErrors })
+    setBackfillResult({
+      total: seasonEntries.length,
+      matched: updates.length - updateErrors,
+      castaways: Object.keys(castawayLookup).length,
+      unmatched: unmatched.slice(0, 10), // show first 10 unmatched for debugging
+    })
     setBackfilling(false)
   }
 
@@ -240,11 +265,26 @@ export default function ScatCategoriesPage() {
               Safe to run multiple times.
             </p>
             {backfillResult && (
-              <p className={`text-xs mt-1.5 ${backfillResult.matched > 0 ? 'text-brand-green' : 'text-brand-muted'}`}>
-                {backfillResult.total === 0
-                  ? 'All entries already linked — nothing to do.'
-                  : `✓ Matched ${backfillResult.matched} of ${backfillResult.total} unlinked entries`}
-              </p>
+              <div className="mt-2 text-xs space-y-0.5">
+                {backfillResult.error ? (
+                  <p className="text-brand-red">Error: {backfillResult.error}</p>
+                ) : backfillResult.total === 0 ? (
+                  <p className="text-brand-muted">All entries already linked — nothing to do.</p>
+                ) : (
+                  <>
+                    <p className={backfillResult.matched > 0 ? 'text-brand-green' : 'text-brand-red'}>
+                      ✓ Matched {backfillResult.matched} of {backfillResult.total} entries
+                      {backfillResult.castaways != null && ` · ${backfillResult.castaways} castaways in DB`}
+                    </p>
+                    {backfillResult.unmatched?.length > 0 && (
+                      <p className="text-brand-muted">
+                        Unmatched: {backfillResult.unmatched.join(', ')}
+                        {backfillResult.total - backfillResult.matched > 10 ? ` +${backfillResult.total - backfillResult.matched - 10} more` : ''}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
           <button
