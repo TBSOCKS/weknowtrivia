@@ -159,10 +159,40 @@ export default function BootOrderSetupPage() {
               </div>
               {showSeasonFilter && (
                 <div className="mt-2 max-h-48 overflow-y-auto flex flex-col gap-1 animate-slide-up">
-                  <div className="flex gap-2 mb-2">
-                    <button onClick={() => setExcludedSeasons(new Set())} className="text-xs text-brand-green hover:underline">Select all</button>
-                    <span className="text-brand-border">·</span>
-                    <button onClick={() => setExcludedSeasons(new Set(seasons.map(s => s.id)))} className="text-xs text-brand-red hover:underline">Deselect all</button>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <button onClick={() => setExcludedSeasons(new Set())}
+                      className="text-xs text-brand-green border border-brand-green/30 hover:bg-brand-green/10 px-2 py-0.5 rounded-md transition-colors">
+                      Select all
+                    </button>
+                    <button onClick={() => setExcludedSeasons(new Set(seasons.map(s => s.id)))}
+                      className="text-xs text-brand-red border border-brand-red/30 hover:bg-brand-red/10 px-2 py-0.5 rounded-md transition-colors">
+                      Deselect all
+                    </button>
+                    <span className="text-brand-border self-center">|</span>
+                    <button onClick={() => {
+                        const newEra = seasons.filter(s => s.season_number >= 41).map(s => s.id)
+                        const excluded = seasons.filter(s => s.season_number < 41).map(s => s.id)
+                        setExcludedSeasons(new Set(excluded))
+                      }}
+                      className="text-xs text-brand-amber border border-brand-amber/30 hover:bg-brand-amber/10 px-2 py-0.5 rounded-md transition-colors">
+                      New Era (41+)
+                    </button>
+                    <button onClick={() => {
+                        const returneeSeasonsNums = [8, 20, 31, 34, 40, 50]
+                        const returnee = seasons.filter(s => returneeSeasonsNums.includes(s.season_number)).map(s => s.id)
+                        const excluded = seasons.filter(s => !returneeSeasonsNums.includes(s.season_number)).map(s => s.id)
+                        setExcludedSeasons(new Set(excluded))
+                      }}
+                      className="text-xs text-brand-amber border border-brand-amber/30 hover:bg-brand-amber/10 px-2 py-0.5 rounded-md transition-colors">
+                      Returnees Only
+                    </button>
+                    <button onClick={() => {
+                        const excluded = seasons.filter(s => s.season_number > 40).map(s => s.id)
+                        setExcludedSeasons(new Set(excluded))
+                      }}
+                      className="text-xs text-brand-amber border border-brand-amber/30 hover:bg-brand-amber/10 px-2 py-0.5 rounded-md transition-colors">
+                      Old Era (1–40)
+                    </button>
                   </div>
                   {seasons.map(s => {
                     const included = !excludedSeasons.has(s.id)
