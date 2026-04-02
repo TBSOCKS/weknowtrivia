@@ -29,8 +29,6 @@ export default function BootOrderSetupPage() {
   // Settings
   const [placementMin, setPlacementMin]   = useState(1)
   const [placementMax, setPlacementMax]   = useState(18)
-  const [timerSeconds, setTimerSeconds]   = useState(60)
-  const [timerEnabled, setTimerEnabled]   = useState(true)
   const [totalRounds, setTotalRounds]     = useState(10)
   const [gameType, setGameType]           = useState('host') // 'host' | 'code'
 
@@ -90,7 +88,7 @@ export default function BootOrderSetupPage() {
     const code = gameType === 'code' ? generateCode() : null
 
     const settings = {
-      timer_seconds:    timerEnabled ? timerSeconds : null,
+      timer_seconds:    null,
       total_rounds:     totalRounds,
       current_round:    1,
       placement_min:    placementMin,
@@ -253,24 +251,6 @@ export default function BootOrderSetupPage() {
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-brand-muted text-xs uppercase tracking-widest">Timer</label>
-                    <button onClick={() => setTimerEnabled(v => !v)}
-                      className={`w-10 h-5 rounded-full transition-colors relative ${timerEnabled ? 'bg-brand-red' : 'bg-brand-border'}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${timerEnabled ? 'left-5' : 'left-0.5'}`} />
-                    </button>
-                  </div>
-                  {timerEnabled && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <label className="text-brand-muted text-xs uppercase tracking-widest">Seconds:</label>
-                        <input type="number" min={5} max={120} value={timerSeconds}
-                          onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v)) setTimerSeconds(v) }}
-                          className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-red" />
-                      </div>
-                      <input type="range" min={5} max={120} step={5} value={timerSeconds}
-                        onChange={e => setTimerSeconds(parseInt(e.target.value))} className="w-full accent-brand-red" />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

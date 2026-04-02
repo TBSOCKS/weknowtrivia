@@ -23,9 +23,6 @@ export default function ListsSetupPage() {
 
   // Other settings
   const [selectedList, setSelectedList]   = useState('')
-  const [timerEnabled, setTimerEnabled]   = useState(false)
-  const [timerSeconds, setTimerSeconds]   = useState(60)
-  const [timerSdEnabled, setTimerSdEnabled] = useState(true)
   const [gameMode, setGameMode]           = useState('strike')
   const [pickStyle, setPickStyle]         = useState('classic')
   const [totalRounds, setTotalRounds]     = useState(10)
@@ -80,8 +77,7 @@ export default function ListsSetupPage() {
     const list = lists.find(l => l.id === selectedList)
     const settings = {
       list_id:              selectedList,
-      timer_seconds:        timerEnabled ? timerSeconds : null,
-      timer_sd_enabled:     timerEnabled ? timerSdEnabled : false,
+      timer_seconds:        null,
       mode:                 gameMode,
       pick_style:           pickStyle,
       total_rounds:         gameMode === 'round' ? totalRounds : null,
@@ -226,54 +222,6 @@ export default function ListsSetupPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Timer */}
-            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-display text-2xl text-white tracking-wide">TIMER</h2>
-                <button onClick={() => setTimerEnabled(v => !v)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${timerEnabled ? 'bg-brand-red' : 'bg-brand-border'}`}>
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${timerEnabled ? 'left-6' : 'left-0.5'}`} />
-                </button>
-              </div>
-              {timerEnabled && (
-                <div className="animate-slide-up flex flex-col gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <label className="text-brand-muted text-xs uppercase tracking-widest">Seconds per guess:</label>
-                      <input
-                        type="number" min={10} max={300}
-                        value={timerSeconds || ''}
-                        onChange={e => {
-                          if (e.target.value === '') { setTimerSeconds(0); return }
-                          const n = parseInt(e.target.value)
-                          if (!isNaN(n)) setTimerSeconds(n)
-                        }}
-                        onBlur={() => {
-                          if (!timerSeconds || timerSeconds < 10) { setTimerSeconds(10); return }
-                          setTimerSeconds(Math.round(timerSeconds / 10) * 10)
-                        }}
-                        className="w-16 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-red"
-                      />
-                    </div>
-                    <input type="range" min={10} max={300} step={10} value={timerSeconds}
-                      onChange={e => setTimerSeconds(parseInt(e.target.value))}
-                      className="w-full accent-brand-red" />
-                    <div className="flex justify-between text-brand-muted text-xs mt-1"><span>10s</span><span>300s</span></div>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-brand-border">
-                    <div>
-                      <div className="text-white text-sm">Timer in Sudden Death</div>
-                      <div className="text-brand-muted text-xs">Keep timer running during SD rounds</div>
-                    </div>
-                    <button onClick={() => setTimerSdEnabled(v => !v)}
-                      className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${timerSdEnabled ? 'bg-brand-red' : 'bg-brand-border'}`}>
-                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${timerSdEnabled ? 'left-6' : 'left-0.5'}`} />
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Leaderboard tracking */}
