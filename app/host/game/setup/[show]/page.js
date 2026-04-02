@@ -24,8 +24,8 @@ const MODES = [
     slug:  'scattergories',
     icon:  '🔤',
     label: 'SCATTERGORIES',
-    desc:  'Category + letter — name something that fits.',
-    available: false,
+    desc:  'Name 5 Survivor players that fit the category — unique answers score big.',
+    available: true,
   },
 ]
 

@@ -17,6 +17,13 @@ const sections = [
     color: 'hover:border-brand-amber hover:shadow-[0_0_20px_rgba(244,162,97,0.15)]',
   },
   {
+    href:  '/host/admin/scat-categories',
+    icon:  '🔤',
+    label: 'SCATTERGORIES CATEGORIES',
+    desc:  'Import and manage trivia categories for Scattergories',
+    color: 'hover:border-brand-green hover:shadow-[0_0_20px_rgba(46,194,126,0.15)]',
+  },
+  {
     href:  '/host/admin/seasons',
     icon:  '📺',
     label: 'SHOWS & SEASONS',
