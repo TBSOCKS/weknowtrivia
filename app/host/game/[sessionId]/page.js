@@ -6,9 +6,13 @@ import GameBoard from '@/components/GameBoard'
 import PlayerCard from '@/components/PlayerCard'
 import CastawaySearch from '@/components/CastawaySearch'
 import { supabase } from '@/lib/supabase'
-import { getCurrentPicker, formatTime, sortPlayers } from '@/lib/gameUtils'export default function GameSessionPage() {
+import { getCurrentPicker, formatTime, sortPlayers } from '@/lib/gameUtils'
+
+export default function GameSessionPage() {
   const { sessionId } = useParams()
-  const router        = useRouter()  const [session, setSession]           = useState(null)
+  const router        = useRouter()
+
+  const [session, setSession]           = useState(null)
   const [players, setPlayers]           = useState([])       // session_players rows
   const [personalities, setPersonalities] = useState({})     // id → personality
   const [answers, setAnswers]           = useState([])       // list_answers with castaways
