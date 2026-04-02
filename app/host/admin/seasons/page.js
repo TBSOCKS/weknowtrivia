@@ -83,8 +83,8 @@ export default function SeasonsPage() {
 
   async function handleAddCastaway(e) {
     e.preventDefault()
-    if (!castawayForm.name || !castawayForm.castaway_id || !castawayForm.placement) {
-      setCastawayError('All fields are required'); return
+    if (!castawayForm.name || !castawayForm.castaway_id) {
+      setCastawayError('Name and ID are required'); return
     }
     setSavingCastaway(true)
     setCastawayError('')
@@ -92,7 +92,7 @@ export default function SeasonsPage() {
       season_id:   castawayTarget,
       name:        castawayForm.name.trim(),
       castaway_id: castawayForm.castaway_id.trim().padStart(4, '0'),
-      placement:   parseInt(castawayForm.placement),
+      placement:   castawayForm.placement ? parseInt(castawayForm.placement) : null,
     })
     if (error) setCastawayError(error.message)
     else {
@@ -233,7 +233,7 @@ export default function SeasonsPage() {
                               className="w-full bg-brand-card border border-brand-border rounded-lg px-3 py-2 text-white text-sm placeholder-brand-muted focus:outline-none focus:border-brand-red" />
                           </div>
                           <div>
-                            <label className="block text-brand-muted text-xs mb-1">Placement</label>
+                            <label className="block text-brand-muted text-xs mb-1">Placement <span className="text-brand-muted/50">(optional)</span></label>
                             <input type="number" value={castawayForm.placement}
                               onChange={e => setCastawayForm(f => ({ ...f, placement: e.target.value }))}
                               placeholder="1"
@@ -281,7 +281,7 @@ export default function SeasonsPage() {
                             <tbody>
                               {castaways[season.id].map(c => (
                                 <tr key={c.id} className="border-b border-brand-border/50 hover:bg-brand-card transition-colors">
-                                  <td className="py-2 pr-4 text-brand-amber font-display text-lg">{c.placement}</td>
+                                  <td className="py-2 pr-4 text-brand-amber font-display text-lg">{c.placement ?? <span className="text-brand-muted text-sm">TBD</span>}</td>
                                   <td className="py-2 pr-4 text-white">{c.name}</td>
                                   <td className="py-2 pr-4 text-brand-muted font-mono">{c.castaway_id}</td>
                                   <td className="py-2 pr-4">

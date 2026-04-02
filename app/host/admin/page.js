@@ -12,8 +12,8 @@ const sections = [
   {
     href:  '/host/admin/import',
     icon:  '📥',
-    label: 'IMPORT CASTAWAYS',
-    desc:  'Bulk import all seasons & castaways from a CSV in one click',
+    label: 'IMPORT PLAYERS',
+    desc:  'Bulk import players from any show via CSV',
     color: 'hover:border-brand-amber hover:shadow-[0_0_20px_rgba(244,162,97,0.15)]',
   },
   {
