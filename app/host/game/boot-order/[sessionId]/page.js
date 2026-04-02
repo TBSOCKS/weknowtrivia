@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import CastawaySearch from '@/components/CastawaySearch'
 import { supabase } from '@/lib/supabase'
-import { formatTime, sortPlayers } from '@/lib/gameUtils'
+import { formatTime } from '@/lib/gameUtils'
 
 // Phases: idle → spinning → answering → revealed → finished
 export default function BootOrderGamePage() {
@@ -40,8 +40,6 @@ export default function BootOrderGamePage() {
 
   // Code game: track which players submitted
   const [submitted, setSubmitted]   = useState(new Set())
-  const [tiebreaker, setTiebreaker]  = useState(false) // in a tiebreaker round
-  const [tbPlayers, setTbPlayers]    = useState([]) // player ids in tiebreaker
 
   const load = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
@@ -148,17 +146,12 @@ export default function BootOrderGamePage() {
     const settings = session.settings ?? {}
     const pMin = settings.placement_min ?? 1
     const pMax = settings.placement_max ?? 18
-    const usedSeasonIds = new Set(settings.used_season_ids ?? [])
 
-    // Filter out already-used seasons; if all used, reset the exclusion list
-    let available = pool.filter(s => !usedSeasonIds.has(s.id))
-    if (available.length === 0) available = pool
-
-    // Try up to 30 times to find a valid season+placement combo
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const season    = available[Math.floor(Math.random() * available.length)]
+    // Try up to 20 times to find a valid season+placement combo
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const season   = pool[Math.floor(Math.random() * pool.length)]
       const placement = Math.floor(Math.random() * (pMax - pMin + 1)) + pMin
-      const castaway  = season.castaways?.find(c => c.placement === placement)
+      const castaway = season.castaways?.find(c => c.placement === placement)
       if (castaway) return { season, placement, castaway }
     }
     return null
@@ -212,46 +205,20 @@ export default function BootOrderGamePage() {
       setTargetPlacement(q.placement)
       setTargetCastaway(q.castaway)
 
-      // Save used season to settings so it won't repeat
-      const prevUsed = session.settings?.used_season_ids ?? []
-      const newUsed  = [...new Set([...prevUsed, q.season.id])]
-      const updatedSettings = { ...(session.settings ?? {}), used_season_ids: newUsed }
-      await supabase.from('game_sessions')
-        .update({ settings: updatedSettings })
-        .eq('id', sessionId)
-      setSession(prev => ({ ...prev, settings: updatedSettings }))
-
-      // Use a unique round number — for tiebreakers, go beyond total_rounds
-      const totalRoundsCount = session.settings?.total_rounds ?? 10
-      let roundNum = session.settings?.current_round ?? 1
-      if (tiebreaker) {
-        // Find the highest existing round number and add 1
-        const { data: existingRounds } = await supabase
-          .from('game_rounds').select('round_number')
-          .eq('session_id', sessionId)
-          .order('round_number', { ascending: false })
-          .limit(1)
-        roundNum = (existingRounds?.[0]?.round_number ?? totalRoundsCount) + 1
-      }
-
-      const { data: round, error: roundErr } = await supabase.from('game_rounds').insert({
+      // Create round in DB
+      const roundNum = (session.settings?.current_round ?? 1)
+      const { data: round } = await supabase.from('game_rounds').insert({
         session_id:    sessionId,
         round_number:  roundNum,
         question_data: {
-          season_id:           q.season.id,
-          version_season:      q.season.version_season,
-          placement:           q.placement,
+          season_id:          q.season.id,
+          version_season:     q.season.version_season,
+          placement:          q.placement,
           correct_castaway_id: q.castaway.id,
         },
         status: 'active',
       }).select().single()
-
-      if (roundErr || !round) {
-        console.error('Round insert failed:', roundErr)
-        setPhase('idle')
-        return
-      }
-      setCurrentRound(round)
+      setCurrentRound(round.data ?? round)
 
       setPhase('answering')
 
@@ -281,11 +248,8 @@ export default function BootOrderGamePage() {
       }
 
       const guessedPlacement = ans.castaway.placement
-      const correctSeasonId  = targetSeason?.id ?? currentRound?.question_data?.season_id
-      const guessedSeasonId  = ans.castaway.seasons?.id
-      const wrongSeason      = correctSeasonId && guessedSeasonId && correctSeasonId !== guessedSeasonId
       const diff = Math.abs(guessedPlacement - targetPlacement)
-      const pts  = wrongSeason ? 0 : diff === 0 ? 3 : diff === 1 ? 1 : 0
+      const pts  = diff === 0 ? 3 : diff === 1 ? 1 : 0
       awardedAnswers[player.id] = { ...ans, score: pts }
 
       if (roundId) {
@@ -323,108 +287,14 @@ export default function BootOrderGamePage() {
     clearInterval(timerRef.current)
   }
 
-  async function saveLeaderboard(allPlayers, winnerPlayer) {
-    const { data: freshSess } = await supabase
-      .from('game_sessions').select('*').eq('id', sessionId).single()
-    if (!freshSess?.settings?.track_leaderboard) return
-    const showId = freshSess.show_id
-
-    for (const p of allPlayers) {
-      const isWinner  = p.id === winnerPlayer?.id
-      const addPoints = p.score ?? 0
-
-      // Write per-session row for deletable history
-      await supabase.from('leaderboard_sessions').insert({
-        session_id:     sessionId,
-        personality_id: p.personality_id,
-        show_id:        showId,
-        mode:           'boot_order',
-        score:          addPoints,
-        won:            isWinner,
-      })
-
-      const { data: existing } = await supabase
-        .from('leaderboard').select('*')
-        .eq('personality_id', p.personality_id)
-        .eq('show_id', showId)
-        .eq('mode', 'boot_order')
-        .maybeSingle()
-
-      if (existing) {
-        await supabase.from('leaderboard').update({
-          games_played: existing.games_played + 1,
-          wins:         existing.wins + (isWinner ? 1 : 0),
-          total_points: existing.total_points + addPoints,
-          updated_at:   new Date().toISOString(),
-        }).eq('id', existing.id)
-      } else {
-        await supabase.from('leaderboard').insert({
-          personality_id: p.personality_id,
-          show_id:        showId,
-          mode:           'boot_order',
-          games_played:   1,
-          wins:           isWinner ? 1 : 0,
-          total_points:   addPoints,
-        })
-      }
-    }
-  }
-
   async function handleNextRound() {
     const settings  = session.settings ?? {}
     const nextRound = (settings.current_round ?? 1) + 1
 
-    if (nextRound > (settings.total_rounds ?? 10) && !tiebreaker) {
-      // Check for tie
-      const sorted   = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      const topScore = sorted[0].score ?? 0
-      const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
-      if (tied.length > 1) {
-        // Start tiebreaker round
-        setTiebreaker(true)
-        setTbPlayers(tied.map(p => p.id))
-        setPhase('idle')
-        clearInterval(timerRef.current)
-        setTimeLeft(null)
-        setCurrentRound(null)
-        setTargetCastaway(null)
-        setTargetSeason(null)
-        setTargetPlacement(null)
-        setAnswers({})
-        setSubmitted(new Set())
-        return
-      }
-      // No tie — game over
+    if (nextRound > (settings.total_rounds ?? 10)) {
+      // Game over
       await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-      await saveLeaderboard(players, sorted[0])
       setPhase('finished')
-      return
-    }
-
-    // After a tiebreaker round — check if still tied
-    if (tiebreaker) {
-      const tbPlayerObjs = players.filter(p => tbPlayers.includes(p.id))
-      const sorted       = [...tbPlayerObjs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      const topScore     = sorted[0].score ?? 0
-      const stillTied    = sorted.filter(p => (p.score ?? 0) === topScore)
-      if (stillTied.length === 1) {
-        // We have a winner
-        await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-        await saveLeaderboard(players, stillTied[0])
-        setPhase('finished')
-        return
-      }
-      // Still tied — another tiebreaker
-      setTbPlayers(stillTied.map(p => p.id))
-      setPhase('idle')
-      clearInterval(timerRef.current)
-      setTimeLeft(null)
-      setCurrentRound(null)
-      setTargetCastaway(null)
-      setTargetSeason(null)
-      setTargetPlacement(null)
-      setAnswers({})
-      setSubmitted(new Set())
       return
     }
 
@@ -447,8 +317,6 @@ export default function BootOrderGamePage() {
   async function handleEndGame() {
     if (!confirm('End this game early?')) return
     await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-    const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    await saveLeaderboard(players, sorted[0])
     setPhase('finished')
   }
 
@@ -615,12 +483,7 @@ export default function BootOrderGamePage() {
 
           {/* Spin button */}
           {phase === 'idle' && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              {tiebreaker && (
-                <div className="font-display text-2xl text-brand-amber tracking-wide animate-pulse">
-                  ⚡ TIEBREAKER — {tbPlayers.length} players
-                </div>
-              )}
+            <div className="flex-1 flex items-center justify-center">
               <button onClick={handleSpin}
                 className="bg-brand-red hover:bg-red-600 text-white font-display text-6xl tracking-widest px-16 py-8 rounded-2xl transition-colors shadow-[0_0_60px_rgba(230,57,70,0.3)] hover:shadow-[0_0_80px_rgba(230,57,70,0.5)] animate-pulse-ring">
                 SPIN
@@ -639,7 +502,7 @@ export default function BootOrderGamePage() {
         <div className="w-96 flex flex-col gap-3 flex-shrink-0 min-h-0 overflow-y-auto">
           <div className="text-brand-muted text-xs uppercase tracking-widest">Players</div>
 
-          {sortPlayers(tiebreaker ? players.filter(p => tbPlayers.includes(p.id)) : players, personalities).map(player => {
+          {players.map(player => {
             const pers = personalities[player.id]
             const ans  = answers[player.id]
             const hasSubmitted = submitted.has(player.id) || (ans?.castaway !== undefined && ans?.castaway !== null)
@@ -732,7 +595,14 @@ export default function BootOrderGamePage() {
           {phase === 'revealed' && (
             <button onClick={handleNextRound}
               className="w-full bg-brand-red hover:bg-red-600 text-white font-display text-2xl tracking-widest py-3 rounded-xl transition-colors mt-2">
-              {roundNum >= totalRounds ? 'FINISH GAME' : `ROUND ${roundNum + 1} →`}
+              {roundNum >= totalRounds
+                ? (() => {
+                    const sorted = [...players].sort((a,b) => (b.score??0)-(a.score??0))
+                    const topScore = sorted[0]?.score ?? 0
+                    const isTie = sorted.filter(p => (p.score??0) === topScore).length > 1
+                    return isTie ? 'TIEBREAKER SPIN →' : 'FINISH GAME'
+                  })()
+                : `ROUND ${roundNum + 1} →`}
             </button>
           )}
         </div>

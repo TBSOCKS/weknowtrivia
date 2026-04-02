@@ -1,17 +1,22 @@
 'use client'
 
-export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder, inSuddenDeath }) {
+export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder, inSuddenDeath, sdEliminatedThisRound }) {
   const strikes = player.strikes ?? 0
+
+  // Grey out if: permanently eliminated, OR eliminated this SD round (but still in SD)
+  const isGreyed = (player.eliminated && !inSuddenDeath) || sdEliminatedThisRound
 
   return (
     <div className={`relative bg-brand-panel border rounded-xl p-2 flex flex-col items-center gap-1.5 transition-all duration-300 ${
-      player.eliminated && !inSuddenDeath
+      isGreyed
         ? 'border-brand-border opacity-40 grayscale'
         : isCurrentPicker
         ? 'border-brand-red picker-glow'
+        : inSuddenDeath
+        ? 'border-brand-red/40'
         : 'border-brand-border'
     }`}>
-      {/* Picking / Eliminated badge */}
+      {/* Picking / Eliminated / Out badges */}
       {isCurrentPicker && !player.eliminated && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-red text-white text-[9px] font-display tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap">
           PICKING

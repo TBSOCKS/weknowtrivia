@@ -135,11 +135,11 @@ export default function GameSessionPage() {
     // If in sudden death, use the clean advanceSdTurn(false) path
     if (suddenDeathRef.current) {
       const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
-    const sdPicker   = players.find(p => p.id === sdPickerId)
-    const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
+      const sdPicker   = players.find(p => p.id === sdPickerId)
+      const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
       setFeedback({ type: 'wrong', message: `⏰ Time's up! ${name} is eliminated from sudden death this round!` })
-    await advanceSdTurn(false)
-    await reloadPlayers()
+      await advanceSdTurn(false)
+      await reloadPlayers()
       return
     }
 
@@ -260,6 +260,13 @@ export default function GameSessionPage() {
     : null
   const effectivePicker = suddenDeath ? sdCurrentPicker : currentPicker
 
+  // Players who've already had their SD turn this round and didn't survive
+  const sdEliminatedThisRound = new Set(
+    sdPlayers
+      .slice(0, sdCurrent)
+      .filter(id => !sdSurvivors.includes(id))
+  )
+
   const activePlayers  = players.filter(p => !p.eliminated)
   const totalAnswers   = answers.length
   const revealedCount  = revealedIds.size
@@ -312,19 +319,12 @@ export default function GameSessionPage() {
         p.id === currentPicker?.id ? { ...p, score: (p.score ?? 0) + 1 } : p
       )      // Check if all answered
       if (newRevealed.size >= totalAnswers) {
+        // All answers revealed — end the game regardless of ties (ties stand as ties)
+        await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
         const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    const topScore = sorted[0].score ?? 0
-        const tied = sorted.filter(p => (p.score ?? 0) === topScore)
-    if (tied.length > 1) {
-          // Sudden death — don't end yet
-          await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-          enterSuddenDeath(tied.map(p => p.id))
-        } else {
-          await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
-    await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
-    setWinner(sorted[0])
-    setGameOver(true)
-        }
+        await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
+        setWinner(sorted[0])
+        setGameOver(true)
       } else {
         await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
         // Check mathematical game-over in strike mode
@@ -521,11 +521,24 @@ export default function GameSessionPage() {
 
 
   // Enter sudden death with a list of tied player IDs
-  function enterSuddenDeath(tiedPlayerIds) {
+  // Marks non-tied active players as eliminated in DB
+  async function enterSuddenDeath(tiedPlayerIds) {
+    // Mark players NOT in the tie as eliminated
+    const nonTied = players.filter(p => !p.eliminated && !tiedPlayerIds.includes(p.id))
+    for (const p of nonTied) {
+      await supabase.from('session_players').update({ eliminated: true }).eq('id', p.id)
+    }
     setSdPlayersSync(tiedPlayerIds)
     setSdCurrentSync(0)
     setSdSurvivorsSync([])
     setSuddenDeathSync(true)
+    // Handle timer for SD entry
+    if (!settings.timer_sd_enabled && settings.timer_sd_enabled !== undefined) {
+      clearInterval(timerRef.current)
+      setTimeLeft(null)
+    } else if (settings.timer_seconds) {
+      resetTimer(settings.timer_seconds)
+    }
   }
 
   // Advance SD turn — call after each guess or timeout
@@ -541,7 +554,11 @@ export default function GameSessionPage() {
 
     if (!roundDone) {
       setSdSurvivorsSync(newSurvivors)
-    setSdCurrentSync(nextIdx)
+      setSdCurrentSync(nextIdx)
+      // Reset timer for next SD player
+      if (settings.timer_seconds && settings.timer_sd_enabled !== false) {
+        resetTimer(settings.timer_seconds)
+      }
       return
     }
 
@@ -555,12 +572,14 @@ export default function GameSessionPage() {
     setGameOver(true)
     } else if (newSurvivors.length > 1) {
       setSdPlayersSync(newSurvivors)
-    setSdCurrentSync(0)
-    setSdSurvivorsSync([])
+      setSdCurrentSync(0)
+      setSdSurvivorsSync([])
+      if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
     } else {
       // Everyone failed — full reset, same players
       setSdCurrentSync(0)
-    setSdSurvivorsSync([])
+      setSdSurvivorsSync([])
+      if (settings.timer_seconds && settings.timer_sd_enabled !== false) resetTimer(settings.timer_seconds)
     }
   }
 
@@ -786,6 +805,7 @@ export default function GameSessionPage() {
                   gameMode={gameMode}
                   turnOrder={p.turn_order}
                   inSuddenDeath={suddenDeath && sdPlayers.includes(p.id)}
+                  sdEliminatedThisRound={sdEliminatedThisRound.has(p.id)}
                 />
               ))}
             </div>
