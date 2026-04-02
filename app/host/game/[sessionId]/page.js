@@ -11,8 +11,7 @@ import { getCurrentPicker, formatTime, sortPlayers } from '@/lib/gameUtils'
 export default function GameSessionPage() {
   const { sessionId } = useParams()
   const router        = useRouter()
-
-  const [session, setSession]           = useState(null)
+    const [session, setSession]           = useState(null)
   const [players, setPlayers]           = useState([])       // session_players rows
   const [personalities, setPersonalities] = useState({})     // id → personality
   const [answers, setAnswers]           = useState([])       // list_answers with castaways
@@ -42,34 +41,41 @@ export default function GameSessionPage() {
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
       supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
-    ])    if (sessRes.error || !sessRes.data) { router.push('/host'); return }
+    ])
+    if (sessRes.error || !sessRes.data) { router.push('/host'); return }
     const sess = sessRes.data
-    setSession(sess)    const playersData = playersRes.data ?? []
-    setPlayers(playersData)    const pMap = {}
+    setSession(sess)
+    const playersData = playersRes.data ?? []
+    setPlayers(playersData)
+    const pMap = {}
     playersData.forEach(p => { pMap[p.personality_id] = p.personalities })
-    setPersonalities(pMap)    const listId = sess.settings?.list_id
+    setPersonalities(pMap)
+    const listId = sess.settings?.list_id
     if (listId) {
       const { data: ansData } = await supabase
         .from('list_answers')
         .select('*, castaways(id, name, castaway_id, seasons(name, version_season))')
         .eq('list_id', listId)
         .order('position')
-      setAnswers(ansData ?? [])      // Load list title
+    setAnswers(ansData ?? [])      // Load list title
       const { data: listData } = await supabase.from('lists').select('title').eq('id', listId).single()
-      if (listData?.title) setListTitle(listData.title)      // Build revealedIds from DB on initial load only
+    if (listData?.title) setListTitle(listData.title)      // Build revealedIds from DB on initial load only
       const roundIds = await supabase
         .from('game_rounds').select('id').eq('session_id', sessionId)
-        .then(r => r.data?.map(r => r.id) ?? [])      const { data: correctAnswers } = roundIds.length
+        .then(r => r.data?.map(r => r.id) ?? [])
+    const { data: correctAnswers } = roundIds.length
         ? await supabase.from('game_answers').select('answer_data').eq('result', 'correct').in('round_id', roundIds)
-        : { data: [] }      const revealed = new Set()
-      const ansMap = {}
+        : { data: [] }
+    const revealed = new Set()
+    const ansMap = {}
       ansData?.forEach(a => { ansMap[a.castaway_id] = a.id })
       ;(correctAnswers ?? []).forEach(ca => {
         const cid = ca.answer_data?.castaway_id
         if (cid && ansMap[cid]) revealed.add(ansMap[cid])
       })
-      setRevealedIds(revealed)
-    }    setLoading(false)
+    setRevealedIds(revealed)
+    }
+    setLoading(false)
   }, [sessionId, router])  // Reload only players/scores after each guess — never touches revealedIds
   const reloadPlayers = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
@@ -91,7 +97,7 @@ export default function GameSessionPage() {
     // Skip timer reset if SD timer is disabled and we're in sudden death
     if (forSuddenDeath && settings?.timer_sd_enabled === false) {
       clearInterval(timerRef.current)
-      setTimeLeft(null)
+    setTimeLeft(null)
       return
     }
     clearInterval(timerRef.current)
@@ -105,9 +111,9 @@ export default function GameSessionPage() {
           clearInterval(timerRef.current)
           // Advance turn on timeout
           advanceTurnOnTimeout()
-          return 0
+    return 0
         }
-        return prev - 1
+    return prev - 1
       })
     }, 1000)
   }  function togglePause() {
@@ -117,11 +123,11 @@ export default function GameSessionPage() {
     // If in sudden death, use the clean advanceSdTurn(false) path
     if (suddenDeathRef.current) {
       const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
-      const sdPicker   = players.find(p => p.id === sdPickerId)
-      const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
+    const sdPicker   = players.find(p => p.id === sdPickerId)
+    const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
       setFeedback({ type: 'wrong', message: `⏰ Time's up! ${name} is eliminated from sudden death this round!` })
-      await advanceSdTurn(false)
-      await reloadPlayers()
+    await advanceSdTurn(false)
+    await reloadPlayers()
       return
     }    // Fetch fresh state from DB (avoids stale React state, especially after undo)
     const [sessRes, playersRes] = await Promise.all([
@@ -130,55 +136,59 @@ export default function GameSessionPage() {
     ])
     if (!sessRes.data) return
     const s = sessRes.data.settings ?? {}
-    const freshPlayers = playersRes.data ?? []    const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
-    await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)    // Strike mode — apply strike to current picker
+    const freshPlayers = playersRes.data ?? []
+    const newSettings = { ...s, guess_count: (s.guess_count ?? 0) + 1 }
+    await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+    // Strike mode — apply strike to current picker
     if ((s.mode ?? 'strike') === 'strike') {
       const freshPicker = getCurrentPicker(freshPlayers, s.guess_count ?? 0, s.pick_style ?? 'classic')
-      if (freshPicker) {
+    if (freshPicker) {
         const newStrikes = (freshPicker.strikes ?? 0) + 1
         const eliminated = newStrikes >= 3
         await supabase.from('session_players')
           .update({ strikes: newStrikes, eliminated })
           .eq('id', freshPicker.id)
-        setLastStrikeUndo({
+    setLastStrikeUndo({
           playerId: freshPicker.id,
           prevStrikes: freshPicker.strikes ?? 0,
           prevEliminated: freshPicker.eliminated ?? false,
           guessCount: s.guess_count ?? 0,
         })
-        setFeedback({ type: 'strike', message: `⏰ Time's up! ${freshPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
-        const updatedPlayers = freshPlayers.map(p =>
+    setFeedback({ type: 'strike', message: `⏰ Time's up! ${freshPicker.personalities?.name?.split(' ')[0]} gets a strike (${newStrikes}/3)` })
+    const updatedPlayers = freshPlayers.map(p =>
           p.id === freshPicker.id ? { ...p, strikes: newStrikes, eliminated } : p
         )
-        await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
+    await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
       }
     }    // Round mode — advance turn and check if game/SD should start
     if ((s.mode ?? 'strike') !== 'strike') {
       const newGuessCount = (s.guess_count ?? 0) + 1
       setLastTurnUndo({ prevGuessCount: s.guess_count ?? 0 })
-      setFeedback({ type: 'wrong', message: `⏰ Time's up! Turn advanced.` })      if (s.total_rounds) {
+    setFeedback({ type: 'wrong', message: `⏰ Time's up! Turn advanced.` })
+    if (s.total_rounds) {
         const active = freshPlayers.filter(p => !p.eliminated)
-        const totalGuesses = s.total_rounds * active.length
+    const totalGuesses = s.total_rounds * active.length
         if (newGuessCount >= totalGuesses) {
           const sorted   = [...freshPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          const topScore = sorted[0]?.score ?? 0
+    const topScore = sorted[0]?.score ?? 0
           const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
-          if (tied.length > 1) {
+    if (tied.length > 1) {
             enterSuddenDeath(tied.map(p => p.id))
-            setLastTurnUndo(null)
-            await reloadPlayers()
-            if (s.timer_seconds && s.timer_sd_enabled !== false) resetTimer(s.timer_seconds)
+    setLastTurnUndo(null)
+    await reloadPlayers()
+    if (s.timer_seconds && s.timer_sd_enabled !== false) resetTimer(s.timer_seconds)
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-            await saveLeaderboard(freshPlayers, sorted[0])
-            setWinner(sorted[0])
-            setGameOver(true)
-            await reloadPlayers()
+    await saveLeaderboard(freshPlayers, sorted[0])
+    setWinner(sorted[0])
+    setGameOver(true)
+    await reloadPlayers()
           }
           return
         }
       }
-    }    await reloadPlayers()
+    }
+    await reloadPlayers()
     const secs = s.timer_seconds
     if (secs) resetTimer(secs)
   }  async function undoTurnAdvance() {
@@ -223,7 +233,9 @@ export default function GameSessionPage() {
   const gameMode     = settings.mode ?? 'strike'
   const pickStyle    = settings.pick_style ?? 'classic'
   const guessCount   = settings.guess_count ?? 0
-  const currentPicker = getCurrentPicker(players, guessCount, pickStyle)  // During sudden death, override the current picker
+  const currentPicker = getCurrentPicker(players, guessCount, pickStyle)
+
+  // During sudden death, override the current picker
   const sdActivePlayers = suddenDeath ? players.filter(p => sdPlayers.includes(p.id)) : []
   const sdCurrentPicker = suddenDeath && sdActivePlayers.length > 0
     ? sdActivePlayers[sdCurrent % Math.max(sdActivePlayers.length, 1)]
@@ -245,11 +257,12 @@ export default function GameSessionPage() {
       .select('id')
       .eq('session_id', sessionId)
       .eq('status', 'active')
-      .single()    const roundId = roundData?.id    if (matchedAnswer) {
+      .single()
+    const roundId = roundData?.id    if (matchedAnswer) {
       // CORRECT
       const newRevealed = new Set(revealedIds)
       newRevealed.add(matchedAnswer.id)
-      setRevealedIds(newRevealed)      // Award point to current picker
+    setRevealedIds(newRevealed)      // Award point to current picker
       if (currentPicker) {
         await supabase
           .from('session_players')
@@ -263,28 +276,32 @@ export default function GameSessionPage() {
           points_awarded:    1,
           result:            'correct',
         })
-      }      setFeedback({ type: 'correct', message: `✓ Correct! ${castaway.name} (${castaway.seasons?.name})` })      // Advance guess count
+      }
+    setFeedback({ type: 'correct', message: `✓ Correct! ${castaway.name} (${castaway.seasons?.name})` })      // Advance guess count
       const newGuessCount = guessCount + 1
-      const newSettings = { ...settings, guess_count: newGuessCount }      // Snapshot updated scores for winner calculation (before stale reloadPlayers)
-      const updatedPlayersAfterCorrect = players.map(p =>
+      const newSettings = { ...settings, guess_count: newGuessCount }
+
+      // Snapshot updated scores for winner calculation (before stale reloadPlayers)
+    const updatedPlayersAfterCorrect = players.map(p =>
         p.id === currentPicker?.id ? { ...p, score: (p.score ?? 0) + 1 } : p
       )      // Check if all answered
       if (newRevealed.size >= totalAnswers) {
         const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-        const topScore = sorted[0].score ?? 0
+    const topScore = sorted[0].score ?? 0
         const tied = sorted.filter(p => (p.score ?? 0) === topScore)
-        if (tied.length > 1) {
+    if (tied.length > 1) {
           // Sudden death — don't end yet
           await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
           enterSuddenDeath(tied.map(p => p.id))
         } else {
           await supabase.from('game_sessions').update({ status: 'finished', settings: newSettings }).eq('id', sessionId)
-          await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
-          setWinner(sorted[0])
-          setGameOver(true)
+    await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
+    setWinner(sorted[0])
+    setGameOver(true)
         }
       } else {
-        await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)        // Check mathematical game-over in strike mode
+        await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+        // Check mathematical game-over in strike mode
         if (gameMode === 'strike') {
           const remaining = totalAnswers - newRevealed.size
           await checkStrikeGameOver(updatedPlayersAfterCorrect, remaining)
@@ -294,16 +311,16 @@ export default function GameSessionPage() {
           const totalGuesses = settings.total_rounds * totalPlayers
           if (newGuessCount >= totalGuesses) {
             const sorted = [...updatedPlayersAfterCorrect].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-            const topScore = sorted[0].score ?? 0
+    const topScore = sorted[0].score ?? 0
             const tied = sorted.filter(p => (p.score ?? 0) === topScore)
-            if (tied.length > 1) {
+    if (tied.length > 1) {
               await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
           enterSuddenDeath(tied.map(p => p.id))
             } else {
               await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-              await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
-              setWinner(sorted[0])
-              setGameOver(true)
+    await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
+    setWinner(sorted[0])
+    setGameOver(true)
             }
           }
         }
@@ -311,9 +328,10 @@ export default function GameSessionPage() {
     } else {
       // WRONG
       const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
-      const notInList = !answers.some(a => a.castaway_id === castaway.id)      if (isAlreadyRevealed) {
+    const notInList = !answers.some(a => a.castaway_id === castaway.id)
+    if (isAlreadyRevealed) {
         setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
-        setSubmitting(false)
+    setSubmitting(false)
         return
       }      if (roundId) {
         await supabase.from('game_answers').insert({
@@ -330,7 +348,8 @@ export default function GameSessionPage() {
         const eliminated = newStrikes >= 3
         await supabase.from('session_players')
           .update({ strikes: newStrikes, eliminated })
-          .eq('id', currentPicker.id)        setFeedback({
+          .eq('id', currentPicker.id)
+    setFeedback({
           type: 'strike',
           message: eliminated
             ? `✗ Wrong! ${currentPicker.personalities?.name?.split(' ')[0]} is ELIMINATED!`
@@ -338,13 +357,15 @@ export default function GameSessionPage() {
         })
       } else {
         setFeedback({ type: 'wrong', message: `✗ Not on the list!` })
-      }      await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)      if (gameMode === 'strike') {
+      }
+    await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
+    if (gameMode === 'strike') {
         const updatedPlayers = players.map(p =>
           p.id === currentPicker?.id
             ? { ...p, strikes: (p.strikes ?? 0) + 1, eliminated: (p.strikes ?? 0) + 1 >= 3 }
             : p
         )
-        const remaining = totalAnswers - revealedIds.size
+    const remaining = totalAnswers - revealedIds.size
         await checkStrikeGameOver(updatedPlayers, remaining)
       }      // Check round mode end on wrong guess too
       if (gameMode === 'round' && settings.total_rounds) {
@@ -352,16 +373,16 @@ export default function GameSessionPage() {
         const totalGuesses = settings.total_rounds * totalPlayers
         if (newGuessCount >= totalGuesses) {
           const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-          const topScore = sorted[0].score ?? 0
+    const topScore = sorted[0].score ?? 0
           const tied = sorted.filter(p => (p.score ?? 0) === topScore)
-          if (tied.length > 1) {
+    if (tied.length > 1) {
             await supabase.from('game_sessions').update({ settings: { ...settings, guess_count: newGuessCount } }).eq('id', sessionId)
           enterSuddenDeath(tied.map(p => p.id))
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-            await saveLeaderboard(players, sorted[0])
-            setWinner(sorted[0])
-            setGameOver(true)
+    await saveLeaderboard(players, sorted[0])
+    setWinner(sorted[0])
+    setGameOver(true)
           }
         }
       }      if (settings.timer_seconds) resetTimer(settings.timer_seconds)
@@ -369,7 +390,7 @@ export default function GameSessionPage() {
     await reloadPlayers()
     } catch (err) {
       console.error('handleGuess error:', err)
-      setFeedback({ type: 'wrong', message: 'Something went wrong — please try again.' })
+    setFeedback({ type: 'wrong', message: 'Something went wrong — please try again.' })
     } finally {
       setSubmitting(false)
     }
@@ -382,7 +403,7 @@ export default function GameSessionPage() {
     const mode   = freshSess.mode    for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
       const addPoints = p.score ?? 0      // Write per-session row (for deletable history)
-      await supabase.from('leaderboard_sessions').insert({
+    await supabase.from('leaderboard_sessions').insert({
         session_id:     sessionId,
         personality_id: p.personality_id,
         show_id:        showId,
@@ -394,7 +415,8 @@ export default function GameSessionPage() {
         .from('leaderboard').select('*')
         .eq('personality_id', p.personality_id)
         .eq('show_id', showId).eq('mode', mode)
-        .maybeSingle()      if (existing) {
+        .maybeSingle()
+    if (existing) {
         await supabase.from('leaderboard').update({
           games_played: existing.games_played + 1,
           wins:         existing.wins + (isWinner ? 1 : 0),
@@ -418,29 +440,32 @@ export default function GameSessionPage() {
     setFeedback(null)
     try {
       const isAlreadyRevealed = answers.some(a => a.castaway_id === castaway.id && revealedIds.has(a.id))
-      if (isAlreadyRevealed) {
+    if (isAlreadyRevealed) {
         setFeedback({ type: 'wrong', message: `${castaway.name} is already on the board!` })
-        setSubmitting(false)
+    setSubmitting(false)
         return
-      }      const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
-      const sdPicker   = players.find(p => p.id === sdPickerId)
-      const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
-      const matchedAnswer = answers.find(a => a.castaway_id === castaway.id && !revealedIds.has(a.id))      if (matchedAnswer) {
+      }
+    const sdPickerId = sdPlayersRef.current[sdCurrentRef.current]
+    const sdPicker   = players.find(p => p.id === sdPickerId)
+    const name       = sdPicker?.personalities?.name?.split(' ')[0] ?? 'Player'
+      const matchedAnswer = answers.find(a => a.castaway_id === castaway.id && !revealedIds.has(a.id))
+    if (matchedAnswer) {
         const newRevealed = new Set(revealedIds)
         newRevealed.add(matchedAnswer.id)
-        setRevealedIds(newRevealed)
-        await supabase.from('session_players')
+    setRevealedIds(newRevealed)
+    await supabase.from('session_players')
           .update({ score: (sdPicker?.score ?? 0) + 1 })
           .eq('id', sdPickerId)
-        setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${name} survives!` })
-        await advanceSdTurn(true)
+    setFeedback({ type: 'correct', message: `✓ ${castaway.name} — ${name} survives!` })
+    await advanceSdTurn(true)
       } else {
         setFeedback({ type: 'wrong', message: `✗ Wrong! ${name} is eliminated from sudden death this round!` })
-        await advanceSdTurn(false)
-      }      await reloadPlayers()
+    await advanceSdTurn(false)
+      }
+    await reloadPlayers()
     } catch (err) {
       console.error('SD error:', err)
-      setFeedback({ type: 'wrong', message: 'Something went wrong — try again.' })
+    setFeedback({ type: 'wrong', message: 'Something went wrong — try again.' })
     } finally {
       setSubmitting(false)
     }
@@ -464,33 +489,32 @@ export default function GameSessionPage() {
     const current_   = sdCurrentRef.current
     const survivors_ = sdSurvivorsRef.current
     const pickerId   = players_[current_]
-
     const newSurvivors = correct ? [...survivors_, pickerId] : survivors_
     const nextIdx      = current_ + 1
     const roundDone    = nextIdx >= players_.length
 
     if (!roundDone) {
       setSdSurvivorsSync(newSurvivors)
-      setSdCurrentSync(nextIdx)
+    setSdCurrentSync(nextIdx)
       return
     }
 
     // Round complete — evaluate
     if (newSurvivors.length === 1) {
       const winnerPlayer = players.find(p => p.id === newSurvivors[0])
-      await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-      await saveLeaderboard(players, winnerPlayer)
-      setSuddenDeathSync(false)
-      setWinner(winnerPlayer)
-      setGameOver(true)
+    await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+    await saveLeaderboard(players, winnerPlayer)
+    setSuddenDeathSync(false)
+    setWinner(winnerPlayer)
+    setGameOver(true)
     } else if (newSurvivors.length > 1) {
       setSdPlayersSync(newSurvivors)
-      setSdCurrentSync(0)
-      setSdSurvivorsSync([])
+    setSdCurrentSync(0)
+    setSdSurvivorsSync([])
     } else {
       // Everyone failed — full reset, same players
       setSdCurrentSync(0)
-      setSdSurvivorsSync([])
+    setSdSurvivorsSync([])
     }
   }
 
@@ -509,18 +533,20 @@ export default function GameSessionPage() {
     } else {
       // Multiple active — leader's gap > remaining = insurmountable
       const sorted = [...stillActive].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      if ((sorted[0].score ?? 0) - (sorted[1].score ?? 0) > remainingAnswers) isOver = true
+    if ((sorted[0].score ?? 0) - (sorted[1].score ?? 0) > remainingAnswers) isOver = true
     }    if (isOver) {
       const sorted   = [...updatedPlayers].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      const topScore = sorted[0].score ?? 0
-      const tied     = sorted.filter(p => (p.score ?? 0) === topScore)      if (tied.length > 1) {
+    const topScore = sorted[0].score ?? 0
+      const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
+    if (tied.length > 1) {
         // Tie — go to sudden death instead of ending
           enterSuddenDeath(tied.map(p => p.id))
-        return true
-      }      await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
-      await saveLeaderboard(updatedPlayers, sorted[0])
-      setWinner(sorted[0])
-      setGameOver(true)
+    return true
+      }
+    await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
+    await saveLeaderboard(updatedPlayers, sorted[0])
+    setWinner(sorted[0])
+    setGameOver(true)
     }
     return isOver
   }  async function handleEndGame() {
@@ -535,7 +561,8 @@ export default function GameSessionPage() {
   )  // GAME OVER screen
   if (gameOver) {
     const winnerPersonality = winner ? personalities[winner.personality_id] : null
-    const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))    return (
+    const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    return (
       <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center px-4">
         <div className="text-center max-w-lg w-full">
           <div className="text-6xl mb-4">🏆</div>
@@ -556,7 +583,7 @@ export default function GameSessionPage() {
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-5 mb-6">
             {sorted.map((p, i) => {
               const pers = personalities[p.personality_id]
-              return (
+    return (
                 <div key={p.id} className={`flex items-center gap-4 py-2.5 ${i < sorted.length - 1 ? 'border-b border-brand-border' : ''}`}>
                   <span className="font-display text-2xl text-brand-muted w-6">{i + 1}</span>
                   <div className="w-9 h-9 rounded-full overflow-hidden bg-brand-card flex-shrink-0">
@@ -663,9 +690,9 @@ export default function GameSessionPage() {
                 <div className="font-display text-base text-brand-red tracking-wide">⚡ SUDDEN DEATH</div>
                 {(() => {
                   const sdActive = players.filter(p => sdPlayers.includes(p.id))
-                  const picker = sdActive[sdCurrent % Math.max(sdActive.length, 1)]
-                  const name = personalities[picker?.personality_id]?.name?.split(' ')[0]
-                  return <div className="text-brand-muted text-xs mt-0.5">{name}'s guess{sdSurvivors.length > 0 ? ` · ${sdSurvivors.length} survived so far` : ''}</div>
+    const picker = sdActive[sdCurrent % Math.max(sdActive.length, 1)]
+    const name = personalities[picker?.personality_id]?.name?.split(' ')[0]
+    return <div className="text-brand-muted text-xs mt-0.5">{name}'s guess{sdSurvivors.length > 0 ? ` · ${sdSurvivors.length} survived so far` : ''}</div>
                 })()}
               </div>
             )}            <CastawaySearch
