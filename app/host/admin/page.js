@@ -17,7 +17,7 @@ const sections = [
     color: 'hover:border-brand-amber hover:shadow-[0_0_20px_rgba(244,162,97,0.15)]',
   },
   {
-    href:  '/host/admin/scat-categories',
+    href:  '/host/admin/scattergories',
     icon:  '🔤',
     label: 'SCATTERGORIES CATEGORIES',
     desc:  'Import and manage trivia categories for Scattergories',
