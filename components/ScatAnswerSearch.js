@@ -55,7 +55,7 @@ export default function ScatAnswerSearch({
       !excluded.includes(e.id) &&
       (q === '' || e.display_name.toLowerCase().includes(q))
     )
-    setResults(filtered.slice(0, 12))
+    setResults(filtered.slice(0, 30))
     if (focused) setOpen(filtered.length > 0)
   }, [query, all, excluded, focused])
 
@@ -99,7 +99,7 @@ export default function ScatAnswerSearch({
         className="w-full bg-brand-card border border-brand-border rounded-xl px-3 py-2.5 text-white placeholder-brand-muted focus:outline-none focus:border-brand-amber transition-colors disabled:opacity-50 text-sm"
       />
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-brand-panel border border-brand-border rounded-xl shadow-2xl overflow-hidden max-h-52 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-brand-panel border border-brand-border rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
           {results.map(entry => {
             const photo    = getPhoto(entry)
             const subtitle = getSubtitle(entry)
@@ -116,7 +116,6 @@ export default function ScatAnswerSearch({
                   <div className="text-white text-sm truncate">{entry.display_name}</div>
                   {subtitle && <div className="text-brand-muted text-xs">{subtitle}</div>}
                 </div>
-                <span className="text-brand-amber font-display text-sm flex-shrink-0">{entry.points}</span>
               </button>
             )
           })}

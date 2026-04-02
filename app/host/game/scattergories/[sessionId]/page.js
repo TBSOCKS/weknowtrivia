@@ -24,6 +24,8 @@ export default function ScattergoriesGamePage() {
 
   // Reveal phase: loaded from DB
   const [revealAnswers, setRevealAnswers] = useState([]) // scat_round_answers rows
+  // Track which answers have had their name revealed (step 1 of 2-step reveal)
+  const [nameRevealed, setNameRevealed] = useState({})
 
   // Round scores for scores phase
   const [roundScores, setRoundScores] = useState([]) // { playerId, name, photo, roundPts, totalScore }
@@ -262,6 +264,7 @@ export default function ScattergoriesGamePage() {
       await updatePhase('timer', { current_round: nextRoundNum })
       setRevealAnswers([])
       setEntryAnswers({})
+      setNameRevealed({})
       setTimerDone(false)
       setTimeLeft(settings.timer_seconds)
       // Load category for next round
@@ -437,7 +440,6 @@ export default function ScattergoriesGamePage() {
                         {a ? (
                           <div className="flex-1 bg-brand-card border border-brand-amber/40 rounded-xl px-3 py-2 flex items-center gap-2">
                             <span className="text-white text-sm flex-1 truncate">{a.displayName}</span>
-                            <span className="text-brand-amber font-display text-sm">{a.points}</span>
                             <button onClick={() => setAnswer(player.id, pos, null)} className="text-brand-muted hover:text-brand-red text-xs ml-1">✕</button>
                           </div>
                         ) : (
@@ -513,6 +515,7 @@ export default function ScattergoriesGamePage() {
                     <div key={a.id} className="flex items-center gap-1.5">
                       <span className="text-brand-muted font-display text-sm w-4 flex-shrink-0">{a.position}</span>
                       {a.revealed ? (
+                        // Step 3: fully revealed — green (unique) or red (nullified)
                         <div className={`flex-1 rounded-xl px-3 py-2.5 border flex items-center gap-2 transition-all ${
                           a.nullified
                             ? 'bg-brand-red/10 border-brand-red/40'
@@ -529,9 +532,24 @@ export default function ScattergoriesGamePage() {
                             <span className="text-brand-red/60 font-display text-xs">0</span>
                           )}
                         </div>
-                      ) : (
+                      ) : nameRevealed[a.id] ? (
+                        // Step 2: name shown — tap to reveal score
                         <button
                           onClick={() => a.entry_id ? revealAnswer(a.id) : handleRevealEmpty(a.id)}
+                          className="flex-1 bg-brand-card border border-brand-amber/30 rounded-xl px-3 py-2.5 flex items-center gap-2 hover:border-brand-amber transition-all text-left">
+                          <span className="text-white text-sm flex-1 truncate">{a.display_name ?? '—'}</span>
+                          <span className="text-brand-muted text-xs flex-shrink-0">TAP FOR SCORE</span>
+                        </button>
+                      ) : (
+                        // Step 1: hidden — tap to reveal name
+                        <button
+                          onClick={() => {
+                            if (!a.entry_id) {
+                              handleRevealEmpty(a.id)
+                            } else {
+                              setNameRevealed(prev => ({ ...prev, [a.id]: true }))
+                            }
+                          }}
                           className="flex-1 bg-brand-card border border-brand-border rounded-xl px-3 py-2.5 text-brand-muted text-xs uppercase tracking-widest hover:border-brand-amber hover:text-white transition-all text-left">
                           TAP TO REVEAL
                         </button>

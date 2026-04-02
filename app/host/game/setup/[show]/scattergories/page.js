@@ -146,19 +146,6 @@ export default function ScattergoriesSetupPage() {
               />
             </div>
 
-            {/* Answers per player */}
-            <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
-              <h2 className="font-display text-2xl text-white tracking-wide mb-4">ANSWERS PER PLAYER</h2>
-              <div className="flex gap-2 flex-wrap">
-                {[3, 4, 5, 6, 7, 8].map(n => (
-                  <button key={n} onClick={() => setAnswersPerPlayer(n)}
-                    className={`w-10 h-10 rounded-lg font-display text-lg transition-all ${answersPerPlayer === n ? 'bg-brand-amber text-black' : 'bg-brand-card border border-brand-border text-brand-muted hover:text-white'}`}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Timer */}
             <div className="bg-brand-panel border border-brand-border rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
@@ -206,11 +193,26 @@ export default function ScattergoriesSetupPage() {
             {/* Rounds + Categories */}
             <div className="bg-brand-panel border border-brand-border rounded-2xl p-6">
               <h2 className="font-display text-2xl text-white tracking-wide mb-4">ROUNDS & CATEGORIES</h2>
-              <div className="flex items-center gap-2 mb-4">
-                <label className="text-brand-muted text-xs uppercase tracking-widest">Rounds:</label>
-                <input type="number" min={1} max={10} value={totalRounds}
-                  onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 1 && v <= 10) setTotalRounds(v) }}
-                  className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-amber" />
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-brand-muted text-xs uppercase tracking-widest">Rounds:</label>
+                  <input type="number" min={1} max={10} value={totalRounds}
+                    onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 1 && v <= 10) setTotalRounds(v) }}
+                    className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-amber" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-brand-muted text-xs uppercase tracking-widest">Answers/player:</label>
+                  <input
+                    type="number" min={3} max={8}
+                    value={answersPerPlayer === 5 ? '' : answersPerPlayer}
+                    placeholder="5"
+                    onChange={e => {
+                      const v = parseInt(e.target.value)
+                      if (e.target.value === '') { setAnswersPerPlayer(5); return }
+                      if (!isNaN(v) && v >= 3 && v <= 8) setAnswersPerPlayer(v)
+                    }}
+                    className="w-14 bg-brand-card border border-brand-border rounded-lg px-2 py-0.5 text-white text-sm font-display text-center focus:outline-none focus:border-brand-amber placeholder-brand-muted" />
+                </div>
               </div>
               <input type="range" min={1} max={10} value={totalRounds}
                 onChange={e => setTotalRounds(parseInt(e.target.value))} className="w-full accent-brand-amber mb-5" />
@@ -226,7 +228,7 @@ export default function ScattergoriesSetupPage() {
                     <div key={idx} className="flex items-center gap-2">
                       <span className="text-brand-muted font-display text-sm w-16 flex-shrink-0">Round {idx + 1}</span>
                       <select value={val} onChange={e => setRoundCategory(idx, e.target.value)}
-                        className="flex-1 bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-amber">
+                        className="flex-1 min-w-0 bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-amber truncate">
                         <option value="random">🎲 Random</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.type === 'career' ? 'Career' : 'Season'})</option>)}
                       </select>
