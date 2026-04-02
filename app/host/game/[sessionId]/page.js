@@ -141,7 +141,9 @@ export default function GameSessionPage() {
     await advanceSdTurn(false)
     await reloadPlayers()
       return
-    }    // Fetch fresh state from DB (avoids stale React state, especially after undo)
+    }
+
+    // Fetch fresh state from DB (avoids stale React state, especially after undo)
     const [sessRes, playersRes] = await Promise.all([
       supabase.from('game_sessions').select('settings').eq('id', sessionId).single(),
       supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
@@ -172,7 +174,9 @@ export default function GameSessionPage() {
         )
     await checkStrikeGameOver(updatedPlayers, totalAnswers - revealedIds.size)
       }
-    }    // Round mode — advance turn and check if game/SD should start
+    }
+
+    // Round mode — advance turn and check if game/SD should start
     if ((s.mode ?? 'strike') !== 'strike') {
       const newGuessCount = (s.guess_count ?? 0) + 1
       setLastTurnUndo({ prevGuessCount: s.guess_count ?? 0 })
@@ -327,7 +331,9 @@ export default function GameSessionPage() {
         if (gameMode === 'strike') {
           const remaining = totalAnswers - newRevealed.size
           await checkStrikeGameOver(updatedPlayersAfterCorrect, remaining)
-        }        // Check round mode end condition
+        }
+
+    // Check round mode end condition
         if (gameMode === 'round' && settings.total_rounds) {
           const totalPlayers = players.filter(p => !p.eliminated).length
           const totalGuesses = settings.total_rounds * totalPlayers
@@ -367,7 +373,9 @@ export default function GameSessionPage() {
           points_awarded:    0,
           result:            'wrong',
         })
-      }      // Strike logic
+      }
+
+    // Strike logic
       const newGuessCount = guessCount + 1
       let newSettings = { ...settings, guess_count: newGuessCount }
 
@@ -395,7 +403,9 @@ export default function GameSessionPage() {
         )
     const remaining = totalAnswers - revealedIds.size
         await checkStrikeGameOver(updatedPlayers, remaining)
-      }      // Check round mode end on wrong guess too
+      }
+
+    // Check round mode end on wrong guess too
       if (gameMode === 'round' && settings.total_rounds) {
         const totalPlayers = players.filter(p => !p.eliminated).length
         const totalGuesses = settings.total_rounds * totalPlayers
@@ -416,7 +426,9 @@ export default function GameSessionPage() {
       }
 
       if (settings.timer_seconds) resetTimer(settings.timer_seconds)
-    }    // Reload players only — revealedIds managed in state
+    }
+
+    // Reload players only — revealedIds managed in state
     await reloadPlayers()
     } catch (err) {
       console.error('handleGuess error:', err)
@@ -430,9 +442,13 @@ export default function GameSessionPage() {
       .from('game_sessions').select('*').eq('id', sessionId).single()
     if (!freshSess?.settings?.track_leaderboard) return
     const showId = freshSess.show_id
-    const mode   = freshSess.mode    for (const p of allPlayers) {
+    const mode   = freshSess.mode
+
+    for (const p of allPlayers) {
       const isWinner  = p.id === winnerPlayer?.id
-      const addPoints = p.score ?? 0      // Write per-session row (for deletable history)
+      const addPoints = p.score ?? 0
+
+      // Write per-session row (for deletable history)
     await supabase.from('leaderboard_sessions').insert({
         session_id:     sessionId,
         personality_id: p.personality_id,
@@ -552,7 +568,9 @@ export default function GameSessionPage() {
   async function checkStrikeGameOver(updatedPlayers, remainingAnswers) {
     const stillActive = updatedPlayers.filter(p => !p.eliminated)
     const eliminated  = updatedPlayers.filter(p => p.eliminated)
-    let isOver = false    if (stillActive.length === 0) {
+    let isOver = false
+
+    if (stillActive.length === 0) {
       isOver = true
     } else if (stillActive.length === 1) {
       const active = stillActive[0]
