@@ -189,7 +189,8 @@ export default function GameSessionPage() {
     const topScore = sorted[0]?.score ?? 0
           const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
     if (tied.length > 1) {
-            enterSuddenDeath(tied.map(p => p.id))
+            await enterSuddenDeath(tied.map(p => p.id))
+            await reloadPlayers()
     setLastTurnUndo(null)
     await reloadPlayers()
     if (s.timer_seconds && s.timer_sd_enabled !== false) resetTimer(s.timer_seconds)
@@ -343,7 +344,8 @@ export default function GameSessionPage() {
             const tied = sorted.filter(p => (p.score ?? 0) === topScore)
     if (tied.length > 1) {
               await supabase.from('game_sessions').update({ settings: newSettings }).eq('id', sessionId)
-          enterSuddenDeath(tied.map(p => p.id))
+          await enterSuddenDeath(tied.map(p => p.id))
+          await reloadPlayers()
             } else {
               await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
     await saveLeaderboard(updatedPlayersAfterCorrect, sorted[0])
@@ -415,7 +417,8 @@ export default function GameSessionPage() {
           const tied = sorted.filter(p => (p.score ?? 0) === topScore)
     if (tied.length > 1) {
             await supabase.from('game_sessions').update({ settings: { ...settings, guess_count: newGuessCount } }).eq('id', sessionId)
-          enterSuddenDeath(tied.map(p => p.id))
+          await enterSuddenDeath(tied.map(p => p.id))
+          await reloadPlayers()
           } else {
             await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
     await saveLeaderboard(players, sorted[0])
@@ -607,7 +610,8 @@ export default function GameSessionPage() {
       const tied     = sorted.filter(p => (p.score ?? 0) === topScore)
     if (tied.length > 1) {
         // Tie — go to sudden death instead of ending
-          enterSuddenDeath(tied.map(p => p.id))
+          await enterSuddenDeath(tied.map(p => p.id))
+          await reloadPlayers()
     return true
       }
     await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)

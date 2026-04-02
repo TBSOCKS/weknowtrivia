@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import { supabase } from '@/lib/supabase'
+import PersonalitySearch from '@/components/PersonalitySearch'
 
 const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order' }
 const SHOW_ICONS  = { 'survivor': '🌴', 'big-brother': '👁️', 'the-challenge': '🏆', 'drag-race': '👑' }
@@ -281,26 +282,44 @@ export default function LeaderboardPage() {
           <div className="bg-brand-panel border border-brand-border rounded-2xl p-6 mb-6">
             <h2 className="font-display text-2xl text-white tracking-wide mb-4">HEAD TO HEAD</h2>
             <div className="flex flex-wrap gap-3 items-end mb-5">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 min-w-44">
                 <label className="text-brand-muted text-xs uppercase tracking-widest">Player 1</label>
-                <select value={h2hA} onChange={e => setH2hA(e.target.value)}
-                  className="bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-amber min-w-40">
-                  <option value="">— Select —</option>
-                  {Object.values(personalities).sort((a,b) => a.name.localeCompare(b.name)).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                {h2hA
+                  ? <div className="flex items-center gap-2 bg-brand-card border border-brand-amber/40 rounded-xl px-3 py-2">
+                      <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-border flex-shrink-0">
+                        {personalities[h2hA]?.photo_url
+                          ? <img src={personalities[h2hA].photo_url} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs">{personalities[h2hA]?.name?.[0]}</div>}
+                      </div>
+                      <span className="text-white text-sm flex-1">{personalities[h2hA]?.name}</span>
+                      <button onClick={() => { setH2hA(''); setH2hResult(null) }} className="text-brand-muted hover:text-brand-red text-xs">✕</button>
+                    </div>
+                  : <PersonalitySearch
+                      onSelect={p => { setH2hA(p.id); setH2hResult(null) }}
+                      excluded={[h2hB].filter(Boolean)}
+                      placeholder="Add player 1…"
+                    />
+                }
               </div>
-              <div className="font-display text-3xl text-brand-muted pb-1">VS</div>
-              <div className="flex flex-col gap-1">
+              <div className="font-display text-3xl text-brand-muted pb-1 self-end mb-2">VS</div>
+              <div className="flex flex-col gap-1 min-w-44">
                 <label className="text-brand-muted text-xs uppercase tracking-widest">Player 2</label>
-                <select value={h2hB} onChange={e => setH2hB(e.target.value)}
-                  className="bg-brand-card border border-brand-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-amber min-w-40">
-                  <option value="">— Select —</option>
-                  {Object.values(personalities).sort((a,b) => a.name.localeCompare(b.name)).filter(p => p.id !== h2hA).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                {h2hB
+                  ? <div className="flex items-center gap-2 bg-brand-card border border-brand-amber/40 rounded-xl px-3 py-2">
+                      <div className="w-7 h-7 rounded-full overflow-hidden bg-brand-border flex-shrink-0">
+                        {personalities[h2hB]?.photo_url
+                          ? <img src={personalities[h2hB].photo_url} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full flex items-center justify-center text-brand-muted text-xs">{personalities[h2hB]?.name?.[0]}</div>}
+                      </div>
+                      <span className="text-white text-sm flex-1">{personalities[h2hB]?.name}</span>
+                      <button onClick={() => { setH2hB(''); setH2hResult(null) }} className="text-brand-muted hover:text-brand-red text-xs">✕</button>
+                    </div>
+                  : <PersonalitySearch
+                      onSelect={p => { setH2hB(p.id); setH2hResult(null) }}
+                      excluded={[h2hA].filter(Boolean)}
+                      placeholder="Add player 2…"
+                    />
+                }
               </div>
               <button onClick={runH2H} disabled={!h2hA || !h2hB || h2hLoading}
                 className="bg-brand-red hover:bg-red-600 disabled:opacity-50 text-white font-display text-xl tracking-widest px-6 py-2 rounded-xl transition-colors">

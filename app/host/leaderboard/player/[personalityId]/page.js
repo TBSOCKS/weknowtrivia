@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import NavBar from '@/components/NavBar'
 import { supabase } from '@/lib/supabase'
+import PersonalitySearch from '@/components/PersonalitySearch'
 import Link from 'next/link'
 
 const MODE_LABELS = { lists: 'Lists', boot_order: 'Boot Order' }
