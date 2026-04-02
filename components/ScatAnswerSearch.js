@@ -26,7 +26,7 @@ export default function ScatAnswerSearch({
       setLoading(true)
       let q = supabase
         .from('scat_entries')
-        .select('*, personalities(id, name, photo_url), castaways(id, castaway_id, name, seasons(id, name, version_season))')
+        .select('id, display_name, points, season_number, photo_url')
         .eq('category_id', categoryId)
         .order('display_name')
 
@@ -67,22 +67,12 @@ export default function ScatAnswerSearch({
   }
 
   function getPhoto(entry) {
-    if (categoryType === 'career' && entry.personalities?.photo_url) {
-      return entry.personalities.photo_url
-    }
-    if (categoryType === 'season' && entry.castaways) {
-      const c = entry.castaways
-      const vs = c.seasons?.version_season
-      if (vs && c.castaway_id) {
-        return `https://gradientdescending.com/survivor/castaways/colour/${vs}US${c.castaway_id}.png`
-      }
-    }
-    return null
+    return entry.photo_url ?? null
   }
 
   function getSubtitle(entry) {
     if (categoryType === 'season') {
-      return entry.castaways?.seasons?.name ?? (entry.season_number ? `Season ${entry.season_number}` : '')
+      return entry.season_number ? `Season ${entry.season_number}` : null
     }
     return null
   }
