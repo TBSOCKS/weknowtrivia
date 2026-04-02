@@ -7,6 +7,7 @@ export default function PersonalitySearch({ onSelect, placeholder = 'Search pers
   const [results, setResults] = useState([])
   const [all, setAll]         = useState([])
   const [open, setOpen]       = useState(false)
+  const [focused, setFocused] = useState(false)
   const containerRef          = useRef(null)
 
   // Load all active personalities once
@@ -15,16 +16,17 @@ export default function PersonalitySearch({ onSelect, placeholder = 'Search pers
       .then(({ data }) => setAll(data ?? []))
   }, [])
 
-  // Filter on query
+  // Filter on query — only open if user has focused the input
   useEffect(() => {
     const q = query.trim().toLowerCase()
     const filtered = all.filter(p =>
       !excluded.includes(p.id) &&
       (q === '' || p.name.toLowerCase().includes(q))
     )
-    setResults(filtered.slice(0, 10))
-    setOpen(filtered.length > 0)
-  }, [query, all, excluded])
+    const sliced = filtered.slice(0, 10)
+    setResults(sliced)
+    if (focused) setOpen(sliced.length > 0)
+  }, [query, all, excluded, focused])
 
   useEffect(() => {
     function onClick(e) {
@@ -38,6 +40,7 @@ export default function PersonalitySearch({ onSelect, placeholder = 'Search pers
     onSelect(p)
     setQuery('')
     setOpen(false)
+    setFocused(false)
   }
 
   return (
@@ -46,7 +49,7 @@ export default function PersonalitySearch({ onSelect, placeholder = 'Search pers
         type="text"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        onFocus={() => setOpen(results.length > 0)}
+        onFocus={() => setFocused(true)}
         placeholder={placeholder}
         className="w-full bg-brand-card border border-brand-border rounded-xl px-4 py-3 text-white placeholder-brand-muted focus:outline-none focus:border-brand-red transition-colors"
       />
