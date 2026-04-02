@@ -239,7 +239,7 @@ export default function GameSessionPage() {
     const secs = sess.data?.settings?.timer_seconds
     if (secs) resetTimer(secs)
   }  // Keep SD refs in sync with state
-  function setSdPlayersSync(v) { sdPlayersRef.current = v; setSdPlayersSync(v) }
+  function setSdPlayersSync(v) { sdPlayersRef.current = v; sdPlayersRef.current = v; setSdPlayers(v)
   function setSuddenDeathSync(v) { suddenDeathRef.current = v; setSuddenDeathSync(v) }  // Derived state
   const settings     = session?.settings ?? {}
   const gameMode     = settings.mode ?? 'strike'
@@ -568,7 +568,9 @@ export default function GameSessionPage() {
     await saveLeaderboard(players, sorted[0])
     setWinner(sorted[0])
     setGameOver(true)
-  }  if (loading) return (
+  }
+
+  if (loading) return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center text-brand-muted">Loading…</div>
   )
 
