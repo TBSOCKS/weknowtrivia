@@ -147,12 +147,27 @@ export default function BootOrderGamePage() {
     const pMin = settings.placement_min ?? 1
     const pMax = settings.placement_max ?? 18
 
-    // Try up to 20 times to find a valid season+placement combo
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const season   = pool[Math.floor(Math.random() * pool.length)]
+    // Exclude seasons already used in this game
+    const usedIds = new Set(settings.used_season_ids ?? [])
+    const available = pool.filter(s => !usedIds.has(s.id))
+
+    // If all seasons have been used, reset the pool (for long games)
+    const pickFrom = available.length > 0 ? available : pool
+
+    // Try up to 30 times to find a valid season+placement combo
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const season    = pickFrom[Math.floor(Math.random() * pickFrom.length)]
       const placement = Math.floor(Math.random() * (pMax - pMin + 1)) + pMin
-      const castaway = season.castaways?.find(c => c.placement === placement)
-      if (castaway) return { season, placement, castaway }
+      const castaway  = season.castaways?.find(c => c.placement === placement)
+      if (castaway) {
+        // Mark this season as used in settings
+        const newUsed = [...usedIds, season.id]
+        await supabase.from('game_sessions')
+          .update({ settings: { ...settings, used_season_ids: newUsed } })
+          .eq('id', sessionId)
+        setSession(prev => ({ ...prev, settings: { ...prev.settings, used_season_ids: newUsed } }))
+        return { season, placement, castaway }
+      }
     }
     return null
   }
