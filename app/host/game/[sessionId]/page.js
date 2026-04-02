@@ -792,23 +792,78 @@ export default function GameSessionPage() {
                 ↩ Undo turn advance
               </button>
             )}
-          </div>          {/* Player cards — 2 columns so up to 8 players fit without scrolling */}
+          </div>          {/* Turn order strip */}
+          {!suddenDeath && (
+            <div className="flex-shrink-0 bg-brand-panel border border-brand-border rounded-xl px-3 py-2 flex items-center gap-2 overflow-x-auto">
+              <span className="text-brand-muted text-[10px] uppercase tracking-widest whitespace-nowrap mr-1">Turn order</span>
+              {(() => {
+                // Show the next N turns (up to 8) starting from current
+                const activeTurnPlayers = [...players]
+                  .filter(p => !p.eliminated)
+                  .sort((a, b) => a.turn_order - b.turn_order)
+                const totalActive = activeTurnPlayers.length
+                if (totalActive === 0) return null
+                const upcoming = []
+                for (let i = 0; i < Math.min(8, totalActive); i++) {
+                  const idx = pickStyle === 'snake'
+                    ? (() => {
+                        const pos = (guessCount + i) % (totalActive <= 1 ? 1 : totalActive * 2)
+                        return pos < totalActive ? pos : totalActive * 2 - 1 - pos
+                      })()
+                    : (guessCount + i) % totalActive
+                  upcoming.push({ player: activeTurnPlayers[idx], offset: i })
+                }
+                return upcoming.map(({ player, offset }) => {
+                  const pers = personalities[player?.personality_id]
+                  const isCurrent = offset === 0
+                  return (
+                    <div key={`${player?.id}-${offset}`} className={`flex flex-col items-center gap-0.5 flex-shrink-0 transition-all ${isCurrent ? 'opacity-100' : 'opacity-40'}`}>
+                      <div className={`w-7 h-7 rounded-full overflow-hidden border-2 ${isCurrent ? 'border-brand-red' : 'border-brand-border'}`}>
+                        {pers?.photo_url
+                          ? <img src={pers.photo_url} className="w-full h-full object-cover" alt="" />
+                          : <div className="w-full h-full bg-brand-card flex items-center justify-center text-[9px] text-brand-muted">{pers?.name?.[0]}</div>
+                        }
+                      </div>
+                      {isCurrent && <div className="w-1 h-1 rounded-full bg-brand-red" />}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          )}
+
+          {/* Player cards — fixed turn order, rank badge shows position */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="text-brand-muted text-xs uppercase tracking-widest px-1 mb-2">Players</div>
-            <div className="grid grid-cols-2 gap-2">
-              {sortPlayers(players, personalities).map(p => (
-                <PlayerCard
-                  key={p.id}
-                  player={p}
-                  personality={personalities[p.personality_id]}
-                  isCurrentPicker={effectivePicker?.id === p.id}
-                  gameMode={gameMode}
-                  turnOrder={p.turn_order}
-                  inSuddenDeath={suddenDeath && sdPlayers.includes(p.id)}
-                  sdEliminatedThisRound={sdEliminatedThisRound.has(p.id)}
-                />
-              ))}
-            </div>
+            {(() => {
+              // Compute rank for each player by score
+              const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+              const rankMap = {}
+              let rank = 1
+              sorted.forEach((p, i) => {
+                if (i > 0 && (p.score ?? 0) < (sorted[i-1].score ?? 0)) rank = i + 1
+                rankMap[p.id] = rank
+              })
+              // Display in fixed turn order
+              const inTurnOrder = [...players].sort((a, b) => a.turn_order - b.turn_order)
+              return (
+                <div className="grid grid-cols-2 gap-2">
+                  {inTurnOrder.map(p => (
+                    <PlayerCard
+                      key={p.id}
+                      player={p}
+                      personality={personalities[p.personality_id]}
+                      isCurrentPicker={effectivePicker?.id === p.id}
+                      gameMode={gameMode}
+                      turnOrder={p.turn_order}
+                      rank={rankMap[p.id]}
+                      inSuddenDeath={suddenDeath && sdPlayers.includes(p.id)}
+                      sdEliminatedThisRound={sdEliminatedThisRound.has(p.id)}
+                    />
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </div>      {/* Pause overlay */}

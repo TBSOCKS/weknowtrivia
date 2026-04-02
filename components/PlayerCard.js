@@ -1,6 +1,6 @@
 'use client'
 
-export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder, inSuddenDeath, sdEliminatedThisRound }) {
+export default function PlayerCard({ player, personality, isCurrentPicker, gameMode, turnOrder, inSuddenDeath, sdEliminatedThisRound, rank }) {
   const strikes = player.strikes ?? 0
 
   // Grey out if: permanently eliminated, OR eliminated this SD round (but still in SD)
@@ -49,8 +49,15 @@ export default function PlayerCard({ player, personality, isCurrentPicker, gameM
         {personality?.name?.split(' ')[0] ?? 'Player'}
       </div>
 
-      {/* Score */}
-      <div className="font-display text-3xl text-white leading-none">{player.score ?? 0}</div>
+      {/* Score + rank */}
+      <div className="flex items-end gap-1.5 leading-none">
+        <div className="font-display text-3xl text-white">{player.score ?? 0}</div>
+        {rank != null && (
+          <div className={`font-display text-xs pb-0.5 ${rank === 1 ? 'text-brand-amber' : 'text-brand-muted'}`}>
+            {rank === 1 ? '1ST' : rank === 2 ? '2ND' : rank === 3 ? '3RD' : `${rank}TH`}
+          </div>
+        )}
+      </div>
       <div className="text-brand-muted text-[10px] -mt-1">pts</div>
 
       {/* Strikes */}
