@@ -43,7 +43,7 @@ export default function BootOrderGamePage() {
 
   const load = useCallback(async () => {
     const [sessRes, playersRes] = await Promise.all([
-      supabase.from('game_sessions').select('*, shows(name)').eq('id', sessionId).single(),
+      supabase.from('game_sessions').select('*, shows(name, slug)').eq('id', sessionId).single(),
       supabase.from('session_players').select('*, personalities(*)').eq('session_id', sessionId).order('turn_order'),
     ])
     if (sessRes.error) { router.push('/host'); return }
@@ -389,8 +389,15 @@ export default function BootOrderGamePage() {
     )
   }
 
-  const photoUrl = (castaway, season) =>
-    castaway && season ? `https://gradientdescending.com/survivor/castaways/colour/${season.version_season}US${castaway.castaway_id}.png` : null
+  const showSlug = session?.shows?.slug ?? 'survivor'
+  const photoUrl = (castaway, season) => {
+    if (showSlug === 'survivor') {
+      return castaway && season
+        ? `https://gradientdescending.com/survivor/castaways/colour/${season.version_season}US${castaway.castaway_id}.png`
+        : null
+    }
+    return castaway?.photo_url ?? null
+  }
 
   return (
     <div className="h-screen bg-brand-bg flex flex-col overflow-hidden relative">
@@ -584,6 +591,8 @@ export default function BootOrderGamePage() {
                     onSelect={c => setPlayerAnswer(player.id, c)}
                     placeholder={hasAnswer ? `✓ ${ans.castaway.name}` : 'Enter answer…'}
                     key={hasAnswer ? ans.castaway.id : 'empty'}
+                    showSlug={showSlug}
+                    showId={session?.show_id}
                   />
                 )}
 
