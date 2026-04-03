@@ -10,6 +10,7 @@ const SHOW_CONFIG = {
     label:      'Survivor',
     slug:       'survivor',
     emoji:      '🌴',
+    seasonPrefix: 'US',
     nameCol:    'castaway',
     idCol:      'castaway_id',
     seasonCol:  'version_season',
@@ -28,6 +29,7 @@ const SHOW_CONFIG = {
     label:      'Big Brother',
     slug:       'big-brother',
     emoji:      '👁️',
+    seasonPrefix: 'BB',
     nameCol:    'houseguest',
     idCol:      'houseguest_id',
     seasonCol:  'season_number',
@@ -44,6 +46,7 @@ const SHOW_CONFIG = {
     label:      'The Challenge',
     slug:       'the-challenge',
     emoji:      '🏆',
+    seasonPrefix: 'TC',
     nameCol:    'challenger',
     idCol:      'challenger_id',
     seasonCol:  'season_number',
@@ -60,6 +63,7 @@ const SHOW_CONFIG = {
     label:      'Drag Race',
     slug:       'drag-race',
     emoji:      '👑',
+    seasonPrefix: 'DR',
     nameCol:    'queen',
     idCol:      'queen_id',
     seasonCol:  'season_number',
@@ -168,8 +172,7 @@ export default function ImportPage() {
         const name = config.slug === 'survivor'
           ? (SURVIVOR_SEASON_NAMES[sn] ?? `Season ${sn}`)
           : `Season ${sn}`
-        const insertData = { show_id: showId, name, season_number: sn }
-        if (config.slug === 'survivor') insertData.version_season = `US${sn}`
+        const insertData = { show_id: showId, name, season_number: sn, version_season: `${config.seasonPrefix}${sn}` }
 
         const { data: existing } = await supabase.from('seasons').select('id')
           .eq('show_id', showId).eq('season_number', sn).single()
