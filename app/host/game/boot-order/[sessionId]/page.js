@@ -316,9 +316,9 @@ export default function BootOrderGamePage() {
         // Extend by one tiebreaker round
         const newTotal = nextRound
         await supabase.from('game_sessions')
-          .update({ settings: { ...settings, current_round: nextRound, total_rounds: newTotal }, current_round: nextRound })
+          .update({ settings: { ...settings, current_round: nextRound, total_rounds: newTotal, in_tiebreaker: true }, current_round: nextRound })
           .eq('id', sessionId)
-        setSession(prev => ({ ...prev, settings: { ...prev.settings, current_round: nextRound, total_rounds: newTotal } }))
+        setSession(prev => ({ ...prev, settings: { ...prev.settings, current_round: nextRound, total_rounds: newTotal, in_tiebreaker: true } }))
         setCurrentRound(null)
         setTargetCastaway(null)
         setTargetSeason(null)
@@ -365,6 +365,7 @@ export default function BootOrderGamePage() {
   const totalRounds = settings.total_rounds ?? 10
   const roundNum    = settings.current_round ?? 1
   const isCodeGame  = settings.game_type === 'code'
+  const inTiebreaker = settings.in_tiebreaker ?? false
 
   // FINISHED
   if (phase === 'finished') {
@@ -436,7 +437,7 @@ export default function BootOrderGamePage() {
           <div className="flex items-center justify-between flex-shrink-0">
             <div>
               <h1 className="font-display text-3xl text-white tracking-wide">{session?.shows?.name} · BOOT ORDER</h1>
-              <p className="text-brand-muted text-xs">Round {roundNum} of {totalRounds}{isCodeGame ? ` · Code: ${session?.code}` : ''}</p>
+              <p className="text-brand-muted text-xs">{inTiebreaker ? '⚡ SUDDEN DEATH' : `Round ${roundNum} of ${totalRounds}`}{isCodeGame ? ` · Code: ${session?.code}` : ''}</p>
             </div>
             <div className="flex items-center gap-3">
               {settings.timer_seconds && timeLeft !== null && phase === 'answering' && (
@@ -567,7 +568,7 @@ export default function BootOrderGamePage() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-full overflow-hidden bg-brand-card flex-shrink-0">
                     {pers?.photo_url
-                      ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover object-top" />
+                      ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center text-brand-muted font-display">{pers?.name?.[0]}</div>
                     }
                   </div>
@@ -648,6 +649,7 @@ export default function BootOrderGamePage() {
                     const sorted = [...players].sort((a,b) => (b.score??0)-(a.score??0))
                     const topScore = sorted[0]?.score ?? 0
                     const isTie = sorted.filter(p => (p.score??0) === topScore).length > 1
+                    if (inTiebreaker && isTie) return 'SUDDEN DEATH SPIN →'
                     return isTie ? 'TIEBREAKER SPIN →' : 'FINISH GAME'
                   })()
                 : `ROUND ${roundNum + 1} →`}
