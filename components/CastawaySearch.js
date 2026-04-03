@@ -89,7 +89,7 @@ export default function CastawaySearch({
               >
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-card border border-brand-border flex-shrink-0">
                   {photo
-                    ? <img src={photo} alt={c.name} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none' }} />
+                    ? <img src={photo} alt={c.name} className="w-full h-full object-cover object-top" onError={e => { e.target.style.display = 'none' }} />
                     : <div className="w-full h-full flex items-center justify-center text-brand-muted font-display text-xs">{c.name[0]}</div>
                   }
                 </div>

@@ -307,7 +307,31 @@ export default function BootOrderGamePage() {
     const nextRound = (settings.current_round ?? 1) + 1
 
     if (nextRound > (settings.total_rounds ?? 10)) {
-      // Game over
+      // Check for tie before ending
+      const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      const topScore = sorted[0]?.score ?? 0
+      const isTie = sorted.filter(p => (p.score ?? 0) === topScore).length > 1
+
+      if (isTie) {
+        // Extend by one tiebreaker round
+        const newTotal = nextRound
+        await supabase.from('game_sessions')
+          .update({ settings: { ...settings, current_round: nextRound, total_rounds: newTotal }, current_round: nextRound })
+          .eq('id', sessionId)
+        setSession(prev => ({ ...prev, settings: { ...prev.settings, current_round: nextRound, total_rounds: newTotal } }))
+        setCurrentRound(null)
+        setTargetCastaway(null)
+        setTargetSeason(null)
+        setTargetPlacement(null)
+        setAnswers({})
+        setSubmitted(new Set())
+        setPhase('idle')
+        clearInterval(timerRef.current)
+        setTimeLeft(null)
+        return
+      }
+
+      // No tie — end game
       await supabase.from('game_sessions').update({ status: 'finished' }).eq('id', sessionId)
       setPhase('finished')
       return
@@ -543,7 +567,7 @@ export default function BootOrderGamePage() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-full overflow-hidden bg-brand-card flex-shrink-0">
                     {pers?.photo_url
-                      ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover" />
+                      ? <img src={pers.photo_url} alt={pers.name} className="w-full h-full object-cover object-top" />
                       : <div className="w-full h-full flex items-center justify-center text-brand-muted font-display">{pers?.name?.[0]}</div>
                     }
                   </div>
