@@ -2,12 +2,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
-export default function CastawaySearch({ onSelect, placeholder = 'Search…', disabled = false, showSlug = 'survivor', showId = null }) {
-  const [query, setQuery]       = useState('')
-  const [results, setResults]   = useState([])
-  const [open, setOpen]         = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const containerRef            = useRef(null)
+export default function CastawaySearch({
+  onSelect,
+  placeholder = 'Search…',
+  disabled = false,
+  showSlug = 'survivor',
+  seasonIds = null,  // array of season UUIDs to restrict results to
+}) {
+  const [query, setQuery]     = useState('')
+  const [results, setResults] = useState([])
+  const [open, setOpen]       = useState(false)
+  const [loading, setLoading] = useState(false)
+  const containerRef          = useRef(null)
 
   useEffect(() => {
     function onClick(e) {
@@ -23,15 +29,13 @@ export default function CastawaySearch({ onSelect, placeholder = 'Search…', di
       setLoading(true)
       let q = supabase
         .from('castaways')
+        .select('id, name, castaway_id, placement, photo_url, seasons(id, name, version_season)')
         .ilike('name', `%${query}%`)
         .limit(20)
 
-      if (showId) {
-        // !inner filters server-side — only returns castaways whose season matches
-        q = q.select('id, name, castaway_id, placement, photo_url, seasons!inner(id, name, version_season, show_id)')
-             .eq('seasons.show_id', showId)
-      } else {
-        q = q.select('id, name, castaway_id, placement, photo_url, seasons(id, name, version_season, show_id)')
+      // Filter by season IDs directly — reliable, no join syntax needed
+      if (seasonIds && seasonIds.length > 0) {
+        q = q.in('season_id', seasonIds)
       }
 
       const { data } = await q
@@ -40,7 +44,7 @@ export default function CastawaySearch({ onSelect, placeholder = 'Search…', di
       setLoading(false)
     }, 200)
     return () => clearTimeout(t)
-  }, [query, showId])
+  }, [query, seasonIds])
 
   function getPhoto(c) {
     if (showSlug === 'survivor') {

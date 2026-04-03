@@ -592,7 +592,7 @@ export default function BootOrderGamePage() {
                     placeholder={hasAnswer ? `✓ ${ans.castaway.name}` : 'Enter answer…'}
                     key={hasAnswer ? ans.castaway.id : 'empty'}
                     showSlug={showSlug}
-                    showId={session?.show_id}
+                    seasonIds={seasonPool.current.map(s => s.id)}
                   />
                 )}
 
